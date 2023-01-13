@@ -35,16 +35,11 @@ type ServeOption struct {
 var defaultTemplates embed.FS
 
 func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
-	authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
-		ClientID:          os.Getenv("GOOGLE_CLIENT_ID"),
-		ClientSecret:      os.Getenv("GOOGLE_CLIENT_SECRET"),
-		SessionEncryptKey: []byte("hogehogehogehoge"),
-		Scopes:            []string{"email"},
-		BaseURL:           opt.BaseURL,
-	})
+	authorizationMiddleware, authenticationMiddleware, err := app.NewAuthMiddlewares(ctx, opt)
 	if err != nil {
-		return fmt.Errorf("failed initialize google OIDC: %w", err)
+		return err
 	}
+
 	var templateFS fs.FS
 	if opt.Templates != "" {
 		templateFS = os.DirFS(opt.Templates)
@@ -130,6 +125,31 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		})
 	})
 
+	accessLoggingMiddleware := accesslogger.New(accesslogger.CombinedDLogger(os.Stderr))
+
+	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
+		accessLoggingMiddleware(
+			authenticationMiddleware(
+				authorizationMiddleware(
+					router,
+				),
+			),
+		),
+	)
+	return nil
+}
+
+func (app *ClipSight) NewAuthMiddlewares(ctx context.Context, opt *ServeOption) (func(http.Handler) http.Handler, func(http.Handler) http.Handler, error) {
+	authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
+		ClientID:          os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret:      os.Getenv("GOOGLE_CLIENT_SECRET"),
+		SessionEncryptKey: []byte("hogehogehogehoge"),
+		Scopes:            []string{"email"},
+		BaseURL:           opt.BaseURL,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed initialize google OIDC: %w", err)
+	}
 	authorizationMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			//auth check
@@ -163,16 +183,5 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			next.ServeHTTP(w, r)
 		})
 	}
-	accessLoggingMiddleware := accesslogger.New(accesslogger.CombinedDLogger(os.Stderr))
-
-	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
-		accessLoggingMiddleware(
-			authenticationMiddleware(
-				authorizationMiddleware(
-					router,
-				),
-			),
-		),
-	)
-	return nil
+	return authorizationMiddleware, authenticationMiddleware, nil
 }
