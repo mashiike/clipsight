@@ -18,7 +18,7 @@ import (
 	"github.com/guregu/dynamo"
 )
 
-var Version string
+var Version string = "current"
 
 // Clipsight is Application instance for resource lifecycle
 type ClipSight struct {

@@ -10,12 +10,6 @@ import (
 	"github.com/mashiike/clipsight"
 )
 
-var version = "current"
-
-func init() {
-	clipsight.Version = version
-}
-
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	defer cancel()
