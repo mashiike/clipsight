@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <title>ClipSight</title>
+</head>
+
+<body>
+    <script>
+        var result = window.fetch(
+            "{{ .BaseURL }}/api/dashboards", {
+            method: 'GET',
+            accept: 'text/html',
+            mode: 'no-cors'
+        })
+            .then(data => {
+                if (!data.ok) {
+                    return
+                }
+                data.json().then(result => {
+                    var tabs = document.getElementById('sights-tab');
+                    var content = document.getElementById('sights-content');
+                    Object.keys(result.dashboards).forEach(key => {
+                        const value = result.dashboards[key]
+                        var tabItem = document.createElement('li');
+                        tabItem.className = "nav-item";
+                        tabItem.setAttribute('role','presentation');
+                        tabItem.innerHTML = '<button class="nav-link" id="'+key+'-tab" data-bs-toggle="tab" data-bs-target="#'+key+'-content" type="button" role="tab" aria-controls="'+key+'" aria-selected="false">'+value.name+'</button>';
+                        tabs.appendChild(tabItem);
+
+                        var contentItem = document.createElement('div');
+                        contentItem.className = "tab-pane";
+                        contentItem.setAttribute('role','tabpanel');
+                        contentItem.setAttribute('aria-labelledby',key+'-tab');
+                        contentItem.id = key+'-content';
+                        contentItem.innerHTML = '<div class="ratio ratio-1x1"><iframe src="'+value.url+'"></iframe></div>';
+                        content.appendChild(contentItem);
+                    });
+                });
+            });
+
+    </script>
+    <ul class="nav nav-tabs" id="sights-tab" role="tablist"></ul>
+
+    <div class="tab-content" id="sights-content"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>
