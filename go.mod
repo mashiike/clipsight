@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.17.3
 	github.com/aws/aws-sdk-go-v2/config v1.18.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.6
-	github.com/aws/aws-sdk-go-v2/service/quicksight v1.28.3
+	github.com/aws/aws-sdk-go-v2/service/quicksight v1.29.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.17.7
 	github.com/fatih/color v1.13.0
 	github.com/fujiwara/logutils v1.1.0
