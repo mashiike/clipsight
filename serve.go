@@ -40,7 +40,7 @@ type ServeOption struct {
 var defaultTemplates embed.FS
 
 func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
-	authorizationMiddleware, authenticationMiddleware, err := app.NewAuthMiddlewares(ctx, opt)
+	authMiddleware, err := app.NewAuthMiddleware(ctx, opt)
 	if err != nil {
 		return err
 	}
@@ -134,17 +134,15 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 
 	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
 		accessLoggingMiddleware(
-			authenticationMiddleware(
-				authorizationMiddleware(
-					router,
-				),
+			authMiddleware(
+				router,
 			),
 		),
 	)
 	return nil
 }
 
-func (app *ClipSight) NewAuthMiddlewares(ctx context.Context, opt *ServeOption) (func(http.Handler) http.Handler, func(http.Handler) http.Handler, error) {
+func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (func(http.Handler) http.Handler, error) {
 	switch strings.ToLower(opt.AuthType) {
 	case "google":
 		authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
@@ -155,44 +153,46 @@ func (app *ClipSight) NewAuthMiddlewares(ctx context.Context, opt *ServeOption) 
 			BaseURL:           opt.BaseURL,
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed initialize google OIDC: %w", err)
+			return nil, fmt.Errorf("failed initialize google OIDC: %w", err)
 		}
-		authorizationMiddleware := func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				//auth check
-				log.Println("[debug] get claim")
-				claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
-				if !ok {
-					http.NotFound(w, r)
-					return
-				}
-				log.Println("[debug] check email")
-				email, ok := claims["email"].(string)
-				if !ok {
-					http.NotFound(w, r)
-					return
-				}
-				user, ok, err := app.GetUser(ctx, Email(email))
-				if err != nil {
-					log.Printf("[error] ERROR CODE 002: %v", err)
-					http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
-					return
-				}
-				if !ok {
-					http.NotFound(w, r)
-					return
-				}
-				if !user.IsActive() {
-					http.NotFound(w, r)
-					return
-				}
-				r = r.WithContext(WithUser(r.Context(), user))
-				next.ServeHTTP(w, r)
-			})
+		m := func(next http.Handler) http.Handler {
+			return authenticationMiddleware(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					//auth check
+					log.Println("[debug] get claim")
+					claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
+					if !ok {
+						http.NotFound(w, r)
+						return
+					}
+					log.Println("[debug] check email")
+					email, ok := claims["email"].(string)
+					if !ok {
+						http.NotFound(w, r)
+						return
+					}
+					user, ok, err := app.GetUser(ctx, Email(email))
+					if err != nil {
+						log.Printf("[error] ERROR CODE 002: %v", err)
+						http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
+						return
+					}
+					if !ok {
+						http.NotFound(w, r)
+						return
+					}
+					if !user.IsActive() {
+						http.NotFound(w, r)
+						return
+					}
+					r = r.WithContext(WithUser(r.Context(), user))
+					next.ServeHTTP(w, r)
+				}),
+			)
 		}
-		return authorizationMiddleware, authenticationMiddleware, nil
+		return m, err
 	default:
-		return nil, nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
+		return nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
 	}
 
 }
