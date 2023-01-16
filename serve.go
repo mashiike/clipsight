@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
+	validator "github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/fujiwara/ridge"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mashiike/accesslogger"
@@ -143,6 +144,24 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 }
 
 func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (func(http.Handler) http.Handler, error) {
+	autholization := func(w http.ResponseWriter, r *http.Request, next http.Handler, email Email) {
+		user, ok, err := app.GetUser(ctx, email)
+		if err != nil {
+			log.Printf("[error] ERROR CODE 002: %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		if !user.IsActive() {
+			http.NotFound(w, r)
+			return
+		}
+		r = r.WithContext(WithUser(r.Context(), user))
+		next.ServeHTTP(w, r)
+	}
 	switch strings.ToLower(opt.AuthType) {
 	case "google":
 		authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
@@ -171,26 +190,24 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 						http.NotFound(w, r)
 						return
 					}
-					user, ok, err := app.GetUser(ctx, Email(email))
-					if err != nil {
-						log.Printf("[error] ERROR CODE 002: %v", err)
-						http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
-						return
-					}
-					if !ok {
-						http.NotFound(w, r)
-						return
-					}
-					if !user.IsActive() {
-						http.NotFound(w, r)
-						return
-					}
-					r = r.WithContext(WithUser(r.Context(), user))
-					next.ServeHTTP(w, r)
+					autholization(w, r, next, Email(email))
 				}),
 			)
 		}
 		return m, err
+	case "aws":
+		m := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				claims, err := validator.Validate(r.Header.Get("x-amzn-oidc-data"))
+				if err != nil {
+					log.Printf("[warn] ERROR CODE 003: %v", err)
+					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 003", http.StatusForbidden)
+					return
+				}
+				autholization(w, r, next, Email(claims.Email()))
+			})
+		}
+		return m, nil
 	default:
 		return nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
 	}
