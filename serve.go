@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"text/template"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,10 +26,14 @@ import (
 
 // ServeOption is Options for CLI Serve command
 type ServeOption struct {
-	BaseURL   *url.URL `help:"site base url" default:"http://localhost:8080"`
-	Addr      string   `help:"local server address" default:":8080"`
-	Prefix    string   `help:"site prefix" default:"/"`
-	Templates string   `help:"Path for index.html template dir" type:"path"`
+	BaseURL                     *url.URL `help:"site base url" default:"http://localhost:8080"`
+	Addr                        string   `help:"local server address" default:":8080"`
+	Prefix                      string   `help:"site prefix" default:"/"`
+	Templates                   string   `help:"Path for index.html template dir" type:"path"`
+	AuthType                    string   `help:"Types of Authentication" enum:"google,aws" default:"google"`
+	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
+	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
 }
 
 //go:embed templates
@@ -140,48 +145,54 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 }
 
 func (app *ClipSight) NewAuthMiddlewares(ctx context.Context, opt *ServeOption) (func(http.Handler) http.Handler, func(http.Handler) http.Handler, error) {
-	authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
-		ClientID:          os.Getenv("GOOGLE_CLIENT_ID"),
-		ClientSecret:      os.Getenv("GOOGLE_CLIENT_SECRET"),
-		SessionEncryptKey: []byte("hogehogehogehoge"),
-		Scopes:            []string{"email"},
-		BaseURL:           opt.BaseURL,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed initialize google OIDC: %w", err)
-	}
-	authorizationMiddleware := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			//auth check
-			log.Println("[debug] get claim")
-			claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
-			if !ok {
-				http.NotFound(w, r)
-				return
-			}
-			log.Println("[debug] check email")
-			email, ok := claims["email"].(string)
-			if !ok {
-				http.NotFound(w, r)
-				return
-			}
-			user, ok, err := app.GetUser(ctx, Email(email))
-			if err != nil {
-				log.Printf("[error] ERROR CODE 002: %v", err)
-				http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
-				return
-			}
-			if !ok {
-				http.NotFound(w, r)
-				return
-			}
-			if !user.IsActive() {
-				http.NotFound(w, r)
-				return
-			}
-			r = r.WithContext(WithUser(r.Context(), user))
-			next.ServeHTTP(w, r)
+	switch strings.ToLower(opt.AuthType) {
+	case "google":
+		authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
+			ClientID:          opt.GoogleClientID,
+			ClientSecret:      opt.GoogleClientSecret,
+			SessionEncryptKey: []byte(opt.GoogleOIDCSessionEncryptKey),
+			Scopes:            []string{"email"},
+			BaseURL:           opt.BaseURL,
 		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed initialize google OIDC: %w", err)
+		}
+		authorizationMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				//auth check
+				log.Println("[debug] get claim")
+				claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
+				if !ok {
+					http.NotFound(w, r)
+					return
+				}
+				log.Println("[debug] check email")
+				email, ok := claims["email"].(string)
+				if !ok {
+					http.NotFound(w, r)
+					return
+				}
+				user, ok, err := app.GetUser(ctx, Email(email))
+				if err != nil {
+					log.Printf("[error] ERROR CODE 002: %v", err)
+					http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
+					return
+				}
+				if !ok {
+					http.NotFound(w, r)
+					return
+				}
+				if !user.IsActive() {
+					http.NotFound(w, r)
+					return
+				}
+				r = r.WithContext(WithUser(r.Context(), user))
+				next.ServeHTTP(w, r)
+			})
+		}
+		return authorizationMiddleware, authenticationMiddleware, nil
+	default:
+		return nil, nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
 	}
-	return authorizationMiddleware, authenticationMiddleware, nil
+
 }
