@@ -27,11 +27,11 @@ import (
 
 // ServeOption is Options for CLI Serve command
 type ServeOption struct {
-	BaseURL                     *url.URL `help:"site base url" default:"http://localhost:8080"`
-	Addr                        string   `help:"local server address" default:":8080"`
-	Prefix                      string   `help:"site prefix" default:"/"`
-	Templates                   string   `help:"Path for index.html template dir" type:"path"`
-	AuthType                    string   `help:"Types of Authentication" enum:"google,aws" default:"google"`
+	BaseURL                     *url.URL `help:"site base url" env:"CLIPSIGHT_BASE_URL" default:"http://localhost:8080"`
+	Addr                        string   `help:"local server address" env:"CLIPSIGHT_ADDR" default:":8080"`
+	Prefix                      string   `help:"site prefix" default:"/" env:"CLIPSIGHT_PREFIX"`
+	Templates                   string   `help:"Path for index.html template dir" type:"path" env:"CLIPSIGHT_TEMPLATES"`
+	AuthType                    string   `help:"Types of Authentication" enum:"google,aws" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
 	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
 	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
