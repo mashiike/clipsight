@@ -6,11 +6,11 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    main: ./cmd/prepalert
-    binary: prepalert
+    main: ./cmd/clipsight
+    binary: clipsight
     ldflags:
       - -s -w
-      - -X github.com/mashiike/prepalert.Version=v{{.Version}}
+      - -X github.com/mashiike/clipsight.Version=v{{.Version}}
     goos:
       - darwin
       - linux
