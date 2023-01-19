@@ -13,7 +13,7 @@
 <body>
     <script>
         var result = window.fetch(
-            "{{ .BaseURL }}/api/dashboards", {
+            "{{ .BaseURL.JoinPath `/api/dashboards` }}", {
             method: 'GET',
             accept: 'text/html',
             mode: 'no-cors'

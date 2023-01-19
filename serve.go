@@ -69,6 +69,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			log.Println("[error] failed execute template ERROR CODE 001:", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
 		}
+		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, &buf)
 	})
