@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/quicksight v1.29.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.0
 	github.com/fatih/color v1.13.0
-	github.com/fujiwara/go-amzn-oidc v0.0.5
+	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/logutils v1.1.0
 	github.com/fujiwara/ridge v0.6.1
 	github.com/guregu/dynamo v1.17.0
@@ -35,7 +35,7 @@ require (
 	github.com/coreos/go-oidc v2.2.1+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gofrs/uuid v4.3.1+incompatible // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
