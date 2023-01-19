@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.1.2](https://github.com/mashiike/clipsight/compare/v0.1.1...v0.1.2) - 2023-01-19
+- update fujiwara/go-amzn-oidc by @mashiike in https://github.com/mashiike/clipsight/pull/11
+- Feature/fix html by @mashiike in https://github.com/mashiike/clipsight/pull/12
+
 ## [v0.1.1](https://github.com/mashiike/clipsight/compare/v0.1.0...v0.1.1) - 2023-01-18
 
 ## [v0.1.0](https://github.com/mashiike/clipsight/commits/v0.1.0) - 2023-01-18
