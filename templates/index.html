@@ -29,16 +29,35 @@
                         const value = result.dashboards[key]
                         var tabItem = document.createElement('li');
                         tabItem.className = "nav-item";
+                        tabItem.classList.add('nav-item')
                         tabItem.setAttribute('role','presentation');
-                        tabItem.innerHTML = '<button class="nav-link" id="'+key+'-tab" data-bs-toggle="tab" data-bs-target="#'+key+'-content" type="button" role="tab" aria-controls="'+key+'" aria-selected="false">'+value.name+'</button>';
+
+                        const button = document.createElement('button');
+                        button.classList.add('nav-link');
+                        button.setAttribute('id', key + '-tab');
+                        button.setAttribute('data-bs-toggle', 'tab');
+                        button.setAttribute('data-bs-target', '#' + key + '-content');
+                        button.setAttribute('type', 'button');
+                        button.setAttribute('role', 'tab');
+                        button.setAttribute('aria-controls', key);
+                        button.setAttribute('selected', false);
+                        const buttonName = document.createTextNode(value.name);
+                        button.appendChild(buttonName);
+                        tabItem.appendChild(button);
                         tabs.appendChild(tabItem);
 
                         var contentItem = document.createElement('div');
-                        contentItem.className = "tab-pane";
+                        contentItem.classList.add('tab-panel');
                         contentItem.setAttribute('role','tabpanel');
                         contentItem.setAttribute('aria-labelledby',key+'-tab');
                         contentItem.id = key+'-content';
-                        contentItem.innerHTML = '<div class="ratio ratio-1x1"><iframe src="'+value.url+'"></iframe></div>';
+                        var contentInnerDiv = document.createElement('div');
+                        contentInnerDiv.classList.add('ratio');
+                        contentInnerDiv.classList.add('ratio-1x1');
+                        const iframe = document.createElement('iframe');
+                        iframe.src = value.url;
+                        contentInnerDiv.appendChild(iframe);
+                        contentItem.appendChild(contentInnerDiv);
                         content.appendChild(contentItem);
                     });
                 });
