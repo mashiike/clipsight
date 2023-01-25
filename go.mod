@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/aws/aws-sdk-go v1.44.180
 	github.com/aws/aws-sdk-go-v2 v1.17.3
-	github.com/aws/aws-sdk-go-v2/config v1.18.8
+	github.com/aws/aws-sdk-go-v2/config v1.18.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.9
 	github.com/aws/aws-sdk-go-v2/service/quicksight v1.30.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.1
