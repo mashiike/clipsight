@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.9
 	github.com/aws/aws-sdk-go-v2/service/quicksight v1.30.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.1
-	github.com/fatih/color v1.14.1
+	github.com/fatih/color v1.15.0
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/logutils v1.1.0
 	github.com/fujiwara/ridge v0.6.1
@@ -51,7 +51,7 @@ require (
 	golang.org/x/exp v0.0.0-20230113213754-f9f960f08ad4 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
