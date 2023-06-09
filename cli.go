@@ -16,7 +16,7 @@ type CLI struct {
 	LogLevel       string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
 	DDBTable       string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
 	PermissionFile string          `help:"Permission file path" env:"CLIPSIGHT_PERMISSION_FILE" default:""`
-	SopsEncryped   bool            `help:"Permission file is encrypted by sops" env:"CLIPSIGHT_SOPS_ENCRYPTED" default:"false"`
+	SopsEncrypted  bool            `help:"Permission file is encrypted by sops" env:"CLIPSIGHT_SOPS_ENCRYPTED" default:"false"`
 	Register       *RegisterOption `cmd:"" help:"Register user"`
 	Grant          *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
 	Revoke         *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`

@@ -111,8 +111,8 @@ func (d *Dashboard) IsVisible() bool {
 }
 
 func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, error) {
-	user := NewUser(email)
 	if app.isDDBMode() {
+		user := NewUser(email)
 		if err := app.ddbTable().Get("HashKey", user.HashKey).Range("SortKey", dynamo.Equal, user.SortKey).Limit(1).OneWithContext(ctx, user); err != nil {
 			if strings.Contains(err.Error(), "no item found") {
 				return user, false, nil
@@ -121,10 +121,17 @@ func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, er
 		}
 		return user, true, nil
 	}
-	return user, false, errors.New("no ddb table mode not implemented")
+	user, ok := app.users[email.String()]
+	if !ok {
+		return NewUser(email), false, nil
+	}
+	return user, true, nil
 }
 
 func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {
+	if !app.isDDBMode() {
+		return errors.New("no ddb table mode not supported")
+	}
 	user = user.FillKey()
 	rev := user.Revision
 	user.Revision++

@@ -30,7 +30,7 @@ var Version string = "current"
 type ClipSight struct {
 	ddbTableName string
 	awsAccountID string
-	users        []*User
+	users        map[string]*User
 	qs           *quicksight.Client
 	sts          *sts.Client
 	ddb          *dynamo.DB
@@ -59,8 +59,96 @@ func New(ctx context.Context, opt *CLI) (*ClipSight, error) {
 
 func newWithPermissionFile(ctx context.Context, opt *CLI, stsClient *sts.Client, quicksightClient *quicksight.Client, awsAccountID string) (*ClipSight, error) {
 	log.Println("[info] permission file mode")
-	return nil, errors.New("permission file mode is not implemented yet")
-
+	pf, err := ReadPermissionFile(opt.PermissionFile, opt.SopsEncrypted)
+	if err != nil {
+		return nil, err
+	}
+	if pf.RequiredVersion.Constraints != nil {
+		v, err := gv.NewVersion(Version)
+		if err != nil {
+			log.Printf("[warn] version is not semver format: %s", Version)
+		} else {
+			if !pf.RequiredVersion.Check(v) {
+				return nil, fmt.Errorf("version %s is not satisfied required version %s", v, pf.RequiredVersion)
+			}
+		}
+	}
+	users := make(map[string]*User, len(pf.Users))
+	app := &ClipSight{
+		awsAccountID: awsAccountID,
+		qs:           quicksightClient,
+		sts:          stsClient,
+	}
+	dashboards := make(map[string]*types.Dashboard)
+	dashboardExists := make(map[string]bool)
+	dashboadPermissions := make(map[string][]types.ResourcePermission)
+	for _, u := range pf.Users {
+		log.Println("[debug] try get quicksight user")
+		qsUser, exists, err := app.DescribeQuickSightUser(ctx, u)
+		if err != nil {
+			return nil, fmt.Errorf("describe quicksight user: %w", err)
+		}
+		if !exists {
+			userName, err := u.QuickSightUserName()
+			if err != nil {
+				return nil, err
+			}
+			qsUser, err = app.RegisterQuickSightUser(ctx, u)
+			if err != nil {
+				return nil, fmt.Errorf("register user: %w", err)
+			}
+			log.Printf("[notice] quicksight user `%s` in namespace `%s` not found, and register this user as reader", userName, u.Namespace)
+		}
+		u.QuickSightUserARN = *qsUser.Arn
+		for _, d := range u.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			var dashboard *types.Dashboard
+			exists, ok := dashboardExists[d.DashboardID]
+			if !ok {
+				var err error
+				dashboard, exists, err = app.DescribeDashboard(ctx, d.DashboardID)
+				if err != nil {
+					return nil, fmt.Errorf("describe dashboard: %w", err)
+				}
+				dashboards[d.DashboardID] = dashboard
+				dashboardExists[d.DashboardID] = exists
+			} else {
+				dashboard = dashboards[d.DashboardID]
+			}
+			if !exists {
+				log.Printf("[warn] dashboard `%s` not found", d.DashboardID)
+				continue
+			}
+			if d.Name == "" {
+				d.Name = *dashboard.Name
+			}
+			permissions, ok := dashboadPermissions[d.DashboardID]
+			if !ok {
+				permissions, err = app.DescribeDashboardParmissions(ctx, d.DashboardID)
+				if err != nil {
+					return nil, fmt.Errorf("describe dashboard: %w", err)
+				}
+				dashboadPermissions[d.DashboardID] = permissions
+			}
+			var granted bool
+			for _, p := range permissions {
+				if *p.Principal == *qsUser.Arn {
+					granted = true
+					break
+				}
+			}
+			if !granted {
+				if err := app.UpdateDashboardParmissions(ctx, d.DashboardID, u.QuickSightUserARN); err != nil {
+					return nil, fmt.Errorf("update dashboard permissions: %w", err)
+				}
+				log.Printf("[notice] grant dashboard `%s` to user `%s`", d.DashboardID, u.Email)
+			}
+		}
+		users[u.Email.String()] = u
+	}
+	return app, nil
 }
 
 type VersionConstraint struct {
@@ -130,6 +218,9 @@ func ReadPermissionFile(filename string, sopsEncrypted bool) (*PermissionFile, e
 		if u.Namespace == "" {
 			u.Namespace = "default"
 		}
+		if err := u.Email.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &pf, nil
 }
@@ -158,7 +249,7 @@ type schema struct {
 	SortKey string `dynamo:"SortKey,range"`
 
 	Revision int64     `dynamo:"Revision"`
-	TTL      time.Time `dynamo:"TTL,unixtime,omitempty"`
+	TTL      time.Time `dynamo:"TTL,unixtime,omitempty" json:"ttl,omitempty" yaml:"ttl,omitempty"`
 }
 
 func (s *schema) IsExpire() bool {
@@ -240,17 +331,7 @@ func (app *ClipSight) DescribeDashboardParmissions(ctx context.Context, dashboar
 	return output.Permissions, nil
 }
 
-func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID string, quickSightUserARN string) error {
-	permissions, err := app.DescribeDashboardParmissions(ctx, dashboardID)
-	if err != nil {
-		return fmt.Errorf("permission check: %w", err)
-	}
-
-	for _, permission := range permissions {
-		if *permission.Principal == quickSightUserARN {
-			return nil
-		}
-	}
+func (app *ClipSight) UpdateDashboardParmissions(ctx context.Context, dashboardID string, quickSightUserARN string) error {
 	log.Printf("[debug] try GrantDashboardParmission(%s, %s, %s)", app.awsAccountID, dashboardID, quickSightUserARN)
 	output, err := app.qs.UpdateDashboardPermissions(ctx, &quicksight.UpdateDashboardPermissionsInput{
 		AwsAccountId: aws.String(app.awsAccountID),
@@ -273,6 +354,20 @@ func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID 
 		return fmt.Errorf("HTTP Status %d", output.Status)
 	}
 	return nil
+}
+
+func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID string, quickSightUserARN string) error {
+	permissions, err := app.DescribeDashboardParmissions(ctx, dashboardID)
+	if err != nil {
+		return fmt.Errorf("permission check: %w", err)
+	}
+
+	for _, permission := range permissions {
+		if *permission.Principal == quickSightUserARN {
+			return nil
+		}
+	}
+	return app.UpdateDashboardParmissions(ctx, dashboardID, quickSightUserARN)
 }
 
 func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID string, quickSightUserARN string) error {
