@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/mail"
+	"os"
 	"strings"
 	"time"
 
@@ -30,21 +31,49 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	Email             Email        `dynamodb:"Email"`
-	Namespace         string       `dynamodb:"Namespace"`
-	IAMRoleARN        string       `dynamodb:"IAMRoleARN"`
-	Region            string       `dynamodb:"Region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards"`
-	Enabled           bool         `dynamodb:"Enabled"`
+	Email             Email        `dynamodb:"Email" yaml:"email"`
+	Namespace         string       `dynamodb:"Namespace" yaml:"namespace"`
+	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn"`
+	Region            string       `dynamodb:"Region" yaml:"region"`
+	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards"`
+	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled"`
 	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime"`
 	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime"`
 	QuickSightUserARN string       `dynamodb:"QuickSightUserARN"`
 }
 
 type Dashboard struct {
-	Name        string
-	DashboardID string    `dynamodb:"DashboardID"`
-	Expire      time.Time `dynamodb:"Expire,unixtime"`
+	Name        string    `yaml:"name,omitempty"`
+	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id"`
+	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire"`
+}
+
+func (u *User) Restrict() error {
+	if u.Email == "" {
+		return errors.New("email is required")
+	}
+	if err := u.Email.Validate(); err != nil {
+		return fmt.Errorf("email is invalid: %w", err)
+	}
+	if u.Namespace == "" {
+		u.Namespace = "default"
+	}
+	if u.IAMRoleARN == "" {
+		return errors.New("iam_role_arn is required")
+	}
+	if u.Region == "" {
+		u.Region = os.Getenv("AWS_REGION")
+		if u.Region == "" {
+			return errors.New("region is required")
+		}
+	}
+	u.FillKey()
+	for i, d := range u.Dashboards {
+		if d.DashboardID == "" {
+			return fmt.Errorf("dashboards[%d].dashboard_id is required", i)
+		}
+	}
+	return nil
 }
 
 func (u *User) FillKey() *User {

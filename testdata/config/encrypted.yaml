@@ -1,0 +1,37 @@
+required_version: '>=0.0.0'
+users:
+    - email: ENC[AES256_GCM,data:S0kwcF6NGUMDQCqwS7qvrQ==,iv:eHIDlhDl6Ul9J1pZFfswltUUcR8NCXiqoj95lTiHZhA=,tag:LMT1JW29RrerORCNeWpEVQ==,type:str]
+      namespace: external
+      iam_role_arn: '{{ must_env `IAM_ROLE_ARN` }}'
+      region: '{{ must_env `AWS_REGION` }}'
+      dashboards:
+        - dashboard_id: 12345678-1234-1234-1234-123456789012
+          expire: "2021-01-01T00:00:00Z"
+      enabled: true
+    - email: ENC[AES256_GCM,data:Slwf+XKLFmdDdQEbpMQ7jw==,iv:zowq4PeuXS5RvKZty1f4M/vYFBGj0U8IMSxFD5AAJHY=,tag:GBVwd09HerScvbFKkiE73A==,type:str]
+      iam_role_arn: '{{ must_env `IAM_ROLE_ARN` }}'
+      dashboards:
+        - dashboard_id: 12345678-1234-1234-1234-123456789012
+          expire: "2021-01-01T00:00:00Z"
+        - dashboard_id: 00000000-0000-0000-0000-000000000000
+      enabled: true
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age1mnw4sfpla0m29rgysg4jh8cu79wrzytty0qqezr9u92mnj2nyafqekjw9q
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmVWpRcndHVVRmWUx1UHY1
+            TjVTR3llQzIzUllyOU9vTFg3VEhEcTJNZ2cwCkpjNzF1bEVNSU82emlBMWZjem43
+            MnY3UXNOWnZlRXBFZWlsanArWEpnZVUKLS0tIEhLeWNSV1dJQkpHRitmSXloMW5Q
+            SVNRZGc3VXU3SmhBOU5ZeWR5ZWMzWjAKCfbKXVfEBbqNzp3zw3jybn24e/DMhz7a
+            DW4CtDkGOAjCdNcLpZFeMpJwRNdZGeuFr926z3jG1Pf6/k4+mPjT0Q==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2023-06-09T08:42:25Z"
+    mac: ENC[AES256_GCM,data:b4+oHt7LXeUmr3wFhiODxFPO1e0QzwZtf49aZbJLDl2dMcOmO0nV7wwIrj4uQLECD913RzNdyXM6TAQ2yoYxy2jyZG3PrbynbxRagCQCFANfnsc8ZL1qxqcRFEPPdgTQAG/R35TALZG+FF7y9UbV3ffadFsbMvAXEnIGuoeCQh0=,iv:4UlikJBumDS2M6XKDoszTooYW/7xQszB+AGaVnh1Adk=,tag:tFNAjznXa77RV0BAxN0sxA==,type:str]
+    pgp: []
+    encrypted_regex: email
+    version: 3.7.3
