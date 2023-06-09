@@ -153,10 +153,12 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return
 		}
 		if !ok {
+			log.Println("[debug] user not found")
 			http.NotFound(w, r)
 			return
 		}
 		if !user.IsActive() {
+			log.Printf("[info] user id %s is not active", user.ID)
 			http.NotFound(w, r)
 			return
 		}
@@ -188,9 +190,11 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 					log.Println("[debug] check email")
 					email, ok := claims["email"].(string)
 					if !ok {
+						log.Println("[debug] email not found")
 						http.NotFound(w, r)
 						return
 					}
+					log.Printf("[debug] email: %s", email)
 					autholization(w, r, next, Email(email))
 				}),
 			)

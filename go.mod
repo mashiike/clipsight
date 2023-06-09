@@ -14,6 +14,7 @@ require (
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/logutils v1.1.2
 	github.com/fujiwara/ridge v0.6.1
+	github.com/google/uuid v1.3.0
 	github.com/guregu/dynamo v1.19.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
@@ -62,7 +63,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.10.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect

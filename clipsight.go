@@ -148,6 +148,7 @@ func newWithPermissionFile(ctx context.Context, opt *CLI, stsClient *sts.Client,
 		}
 		users[u.Email.String()] = u
 	}
+	app.users = users
 	return app, nil
 }
 
@@ -212,6 +213,9 @@ func ReadPermissionFile(filename string, sopsEncrypted bool) (*PermissionFile, e
 		return nil, err
 	}
 	for _, u := range pf.Users {
+		if u.ID == "" {
+			return nil, fmt.Errorf("user id is required")
+		}
 		if u.Region == "" {
 			u.Region = os.Getenv("AWS_REGION")
 		}
@@ -221,6 +225,7 @@ func ReadPermissionFile(filename string, sopsEncrypted bool) (*PermissionFile, e
 		if err := u.Email.Validate(); err != nil {
 			return nil, err
 		}
+		u.Enabled = true
 	}
 	return &pf, nil
 }

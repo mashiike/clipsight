@@ -1,13 +1,15 @@
 required_version: '>=0.0.0'
 users:
-    - email: ENC[AES256_GCM,data:S0kwcF6NGUMDQCqwS7qvrQ==,iv:eHIDlhDl6Ul9J1pZFfswltUUcR8NCXiqoj95lTiHZhA=,tag:LMT1JW29RrerORCNeWpEVQ==,type:str]
+    - id: 00000000-0000-0000-0000-000000000000
+      email: ENC[AES256_GCM,data:S0kwcF6NGUMDQCqwS7qvrQ==,iv:eHIDlhDl6Ul9J1pZFfswltUUcR8NCXiqoj95lTiHZhA=,tag:LMT1JW29RrerORCNeWpEVQ==,type:str]
       namespace: external
       iam_role_arn: '{{ must_env `IAM_ROLE_ARN` }}'
       region: '{{ must_env `AWS_REGION` }}'
       dashboards:
         - dashboard_id: 12345678-1234-1234-1234-123456789012
           expire: "2021-01-01T00:00:00Z"
-    - email: ENC[AES256_GCM,data:Slwf+XKLFmdDdQEbpMQ7jw==,iv:zowq4PeuXS5RvKZty1f4M/vYFBGj0U8IMSxFD5AAJHY=,tag:GBVwd09HerScvbFKkiE73A==,type:str]
+    - id: 00000000-0000-0000-0000-000000000001
+      email: ENC[AES256_GCM,data:Slwf+XKLFmdDdQEbpMQ7jw==,iv:zowq4PeuXS5RvKZty1f4M/vYFBGj0U8IMSxFD5AAJHY=,tag:GBVwd09HerScvbFKkiE73A==,type:str]
       iam_role_arn: '{{ must_env `IAM_ROLE_ARN` }}'
       dashboards:
         - dashboard_id: 12345678-1234-1234-1234-123456789012
@@ -28,8 +30,8 @@ sops:
             SVNRZGc3VXU3SmhBOU5ZeWR5ZWMzWjAKCfbKXVfEBbqNzp3zw3jybn24e/DMhz7a
             DW4CtDkGOAjCdNcLpZFeMpJwRNdZGeuFr926z3jG1Pf6/k4+mPjT0Q==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2023-06-09T05:49:11Z"
-    mac: ENC[AES256_GCM,data:sWc6Nu5AhqRTV2+W6lYh+bMEaQLBf5Kes5LCK/fhL1S+znyPWhfhrhpU4DLGugPTL3XCoxITJqsszKxdtH9roFJLoIR923ckRmnbFvMO38X9x8ecN30mG7Q+/tt4esAfaa+TegKC6xfL7y6x6BIzQcZ5GnNj8OLz08LdG9QWP2M=,iv:1iH4rlBl+6FrsaUBn8eptHGuiv0KJiMyhIOAhoFENFg=,tag:VNUdDjx9GPHZOx5nUt3fDA==,type:str]
+    lastmodified: "2023-06-09T07:22:06Z"
+    mac: ENC[AES256_GCM,data:KufJO4S4RgHCIZc+9K4iFCSQG2OE2lGQkLJUBH1hTt+VuuBHcgM8SySGVV9aj+9WQQr2jNVa0tOHMJNbj8MER/NtxfNRKVuPbO+uBjb3WZ5FugmeRxpbCRTtJ+tlzgkTF2kb4Bw8B1YO1vWd5/g+tPvG4hVByDOgfUdvvlGQSFI=,iv:WBD6oHjTY6x+J140w55+se53Db4jFv3AU7OV02T62aI=,tag:bLRgySC1WaSc43E7eEU1Hw==,type:str]
     pgp: []
     encrypted_regex: email
     version: 3.7.3

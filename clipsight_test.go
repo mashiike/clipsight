@@ -61,6 +61,7 @@ func TestReadPermissionFile__NoEncrypted(t *testing.T) {
 		RequiredVersion: pf.RequiredVersion,
 		Users: []*clipsight.User{
 			{
+				ID:         "00000000-0000-0000-0000-000000000000",
 				Email:      "hoge@example.com",
 				Region:     "ap-northeast-1",
 				Namespace:  "external",
@@ -71,8 +72,10 @@ func TestReadPermissionFile__NoEncrypted(t *testing.T) {
 						Expire:      time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 					},
 				},
+				Enabled: true,
 			},
 			{
+				ID:         "00000000-0000-0000-0000-000000000001",
 				Email:      "fuga@example.com",
 				Region:     "ap-northeast-1",
 				Namespace:  "default",
@@ -86,6 +89,7 @@ func TestReadPermissionFile__NoEncrypted(t *testing.T) {
 						DashboardID: "00000000-0000-0000-0000-000000000000",
 					},
 				},
+				Enabled: true,
 			},
 		},
 	}

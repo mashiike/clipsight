@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
+	"github.com/google/uuid"
 	"github.com/guregu/dynamo"
 )
 
@@ -30,6 +31,7 @@ func (email Email) String() string {
 
 type User struct {
 	schema
+	ID                string       `dynamodb:"ID,hash" json:"id" yaml:"id"`
 	Email             Email        `dynamodb:"Email" json:"email" yaml:"email"`
 	Namespace         string       `dynamodb:"Namespace" json:"namespace" yaml:"namespace"`
 	IAMRoleARN        string       `dynamodb:"IAMRoleARN" json:"iam_role_arn" yaml:"iam_role_arn"`
@@ -50,6 +52,9 @@ type Dashboard struct {
 func (u *User) FillKey() *User {
 	u.HashKey = "USER"
 	u.SortKey = "USER:" + u.Email.String()
+	if id, err := uuid.NewRandom(); err == nil {
+		u.ID = id.String()
+	}
 	return u
 }
 
