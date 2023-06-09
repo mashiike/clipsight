@@ -1,11 +1,14 @@
 package clipsight
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,6 +19,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/guregu/dynamo"
+	gv "github.com/hashicorp/go-version"
+	"go.mozilla.org/sops/v3/decrypt"
+	"gopkg.in/yaml.v3"
 )
 
 var Version string = "current"
@@ -24,6 +30,7 @@ var Version string = "current"
 type ClipSight struct {
 	ddbTableName string
 	awsAccountID string
+	users        []*User
 	qs           *quicksight.Client
 	sts          *sts.Client
 	ddb          *dynamo.DB
@@ -40,28 +47,109 @@ func New(ctx context.Context, opt *CLI) (*ClipSight, error) {
 	if err != nil {
 		return nil, err
 	}
+	quicksightClient := quicksight.NewFromConfig(awsCfgV2)
 	if opt.PermissionFile != "" {
-		log.Println("[info] permission file mode")
-		return nil, errors.New("permission file mode is not implemented yet")
+		return newWithPermissionFile(ctx, opt, stsClient, quicksightClient, *getCallerIdentityOutput.Account)
 	} else if opt.DDBTable != "" {
-		log.Println("[info] use ddb table mode")
-		sess, err := session.NewSessionWithOptions(session.Options{
-			SharedConfigState: session.SharedConfigEnable,
-		})
-		if err != nil {
-			return nil, err
-		}
-		app := &ClipSight{
-			ddbTableName: opt.DDBTable,
-			awsAccountID: *getCallerIdentityOutput.Account,
-			qs:           quicksight.NewFromConfig(awsCfgV2),
-			sts:          stsClient,
-			ddb:          dynamo.New(sess),
-		}
-		return app, nil
+		return newWithDDB(ctx, opt, stsClient, quicksightClient, *getCallerIdentityOutput.Account)
 	} else {
 		return nil, errors.New("permission file or ddb table name is required")
 	}
+}
+
+func newWithPermissionFile(ctx context.Context, opt *CLI, stsClient *sts.Client, quicksightClient *quicksight.Client, awsAccountID string) (*ClipSight, error) {
+	log.Println("[info] permission file mode")
+	return nil, errors.New("permission file mode is not implemented yet")
+
+}
+
+type VersionConstraint struct {
+	gv.Constraints
+}
+
+func (c *VersionConstraint) UnmarshalYAML(node *yaml.Node) error {
+	var s string
+	if err := node.Decode(&s); err != nil {
+		return err
+	}
+	if s == "" {
+		return nil
+	}
+	constraints, err := gv.NewConstraint(s)
+	if err != nil {
+		return err
+	}
+	c.Constraints = constraints
+	return nil
+}
+
+type PermissionFile struct {
+	RequiredVersion VersionConstraint `yaml:"required_version"`
+	Users           []*User           `yaml:"users"`
+}
+
+func ReadPermissionFile(filename string, sopsEncrypted bool) (*PermissionFile, error) {
+	var bs []byte
+	var err error
+	if sopsEncrypted {
+		bs, err = decrypt.File(filename, "yaml")
+	} else {
+		bs, err = os.ReadFile(filename)
+	}
+	if err != nil {
+		return nil, err
+	}
+	tpl, err := template.New("permission_file").Funcs(template.FuncMap{
+		"must_env": func(key string) (string, error) {
+			if v, ok := os.LookupEnv(key); ok {
+				return v, nil
+			}
+			return "", fmt.Errorf("environment variable %s is not defined", key)
+		},
+		"env": func(key string) string {
+			return os.Getenv(key)
+		},
+	}).Parse(string(bs))
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, nil); err != nil {
+		return nil, err
+	}
+	decoder := yaml.NewDecoder(&buf)
+	decoder.KnownFields(true)
+	var pf PermissionFile
+	if err := decoder.Decode(&pf); err != nil {
+		return nil, err
+	}
+	for _, u := range pf.Users {
+		if u.Region == "" {
+			u.Region = os.Getenv("AWS_REGION")
+		}
+		if u.Namespace == "" {
+			u.Namespace = "default"
+		}
+	}
+	return &pf, nil
+}
+
+func newWithDDB(ctx context.Context, opt *CLI, stsClient *sts.Client, quicksightClient *quicksight.Client, awsAccountID string) (*ClipSight, error) {
+	log.Println("[info] ddb table mode")
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		return nil, err
+	}
+	app := &ClipSight{
+		ddbTableName: opt.DDBTable,
+		awsAccountID: awsAccountID,
+		qs:           quicksightClient,
+		sts:          stsClient,
+		ddb:          dynamo.New(sess),
+	}
+	return app, nil
 }
 
 // Management table for github.com/mashiike/clipsight

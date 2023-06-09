@@ -1,0 +1,16 @@
+required_version: ">=0.0.0"
+
+users:
+  - email: "hoge@example.com"
+    namespace: "external"
+    iam_role_arn: "{{ must_env `IAM_ROLE_ARN` }}"
+    region: "{{ must_env `AWS_REGION` }}"
+    dashboards:
+      - dashboard_id: 12345678-1234-1234-1234-123456789012
+        expire: "2021-01-01T00:00:00Z"
+  - email: "fuga@example.com"
+    iam_role_arn: "{{ must_env `IAM_ROLE_ARN` }}"
+    dashboards:
+      - dashboard_id: 12345678-1234-1234-1234-123456789012
+        expire: "2021-01-01T00:00:00Z"
+      - dashboard_id: 00000000-0000-0000-0000-000000000000
