@@ -30,7 +30,7 @@ type ClipSight struct {
 }
 
 // New returns initialized application instance
-func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
+func New(ctx context.Context, opt *CLI) (*ClipSight, error) {
 	awsCfgV2, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -40,20 +40,28 @@ func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
 	if err != nil {
 		return nil, err
 	}
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
-	if err != nil {
-		return nil, err
+	if opt.PermissionFile != "" {
+		log.Println("[info] permission file mode")
+		return nil, errors.New("permission file mode is not implemented yet")
+	} else if opt.DDBTable != "" {
+		log.Println("[info] use ddb table mode")
+		sess, err := session.NewSessionWithOptions(session.Options{
+			SharedConfigState: session.SharedConfigEnable,
+		})
+		if err != nil {
+			return nil, err
+		}
+		app := &ClipSight{
+			ddbTableName: opt.DDBTable,
+			awsAccountID: *getCallerIdentityOutput.Account,
+			qs:           quicksight.NewFromConfig(awsCfgV2),
+			sts:          stsClient,
+			ddb:          dynamo.New(sess),
+		}
+		return app, nil
+	} else {
+		return nil, errors.New("permission file or ddb table name is required")
 	}
-	app := &ClipSight{
-		ddbTableName: ddbTableName,
-		awsAccountID: *getCallerIdentityOutput.Account,
-		qs:           quicksight.NewFromConfig(awsCfgV2),
-		sts:          stsClient,
-		ddb:          dynamo.New(sess),
-	}
-	return app, nil
 }
 
 // Management table for github.com/mashiike/clipsight
@@ -74,6 +82,10 @@ func (s *schema) IsExpire() bool {
 
 func (app *ClipSight) ddbTable() dynamo.Table {
 	return app.ddb.Table(app.ddbTableName)
+}
+
+func (app *ClipSight) isDDBMode() bool {
+	return app.ddb != nil
 }
 
 func (app *ClipSight) prepareDynamoDB(ctx context.Context) error {

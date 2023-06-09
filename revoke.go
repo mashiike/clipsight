@@ -12,12 +12,12 @@ type RevokeOption struct {
 }
 
 func (app *ClipSight) RunRevoke(ctx context.Context, opt *RevokeOption) error {
+	if !app.isDDBMode() {
+		return fmt.Errorf("revoke command is only available in ddb mode")
+	}
 	email := Email(opt.Email)
 	if err := email.Validate(); err != nil {
 		return fmt.Errorf("validate email: %w", err)
-	}
-	if err := app.prepareDynamoDB(ctx); err != nil {
-		return err
 	}
 
 	log.Println("[debug] try get user", email)

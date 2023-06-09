@@ -212,5 +212,4 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 	default:
 		return nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
 	}
-
 }

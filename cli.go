@@ -13,13 +13,15 @@ import (
 )
 
 type CLI struct {
-	LogLevel string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
-	DDBTable string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
-	Register *RegisterOption `cmd:"" help:"Register user"`
-	Grant    *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
-	Revoke   *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
-	Serve    *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
-	Version  struct{}        `cmd:"" help:"Show version"`
+	LogLevel       string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
+	DDBTable       string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
+	PermissionFile string          `help:"Permission file path" env:"CLIPSIGHT_PERMISSION_FILE" default:""`
+	SopsEncryped   bool            `help:"Permission file is encrypted by sops" env:"CLIPSIGHT_SOPS_ENCRYPTED" default:"false"`
+	Register       *RegisterOption `cmd:"" help:"Register user"`
+	Grant          *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
+	Revoke         *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
+	Serve          *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
+	Version        struct{}        `cmd:"" help:"Show version"`
 }
 
 func RunCLI(ctx context.Context, args []string) error {
@@ -45,7 +47,7 @@ func RunCLI(ctx context.Context, args []string) error {
 		Writer:   os.Stderr,
 	}
 	log.SetOutput(filter)
-	app, err := New(ctx, cli.DDBTable)
+	app, err := New(ctx, &cli)
 	if err != nil {
 		return err
 	}
@@ -54,6 +56,13 @@ func RunCLI(ctx context.Context, args []string) error {
 }
 
 func (app *ClipSight) Dispatch(ctx context.Context, command string, cli *CLI) error {
+	if command != "version" {
+		if app.isDDBMode() {
+			if err := app.prepareDynamoDB(ctx); err != nil {
+				return err
+			}
+		}
+	}
 	switch command {
 	case "register":
 		return app.RunRegister(ctx, cli.Register)

@@ -18,9 +18,6 @@ func (app *ClipSight) RunGrant(ctx context.Context, opt *GrantOption) error {
 	if err := email.Validate(); err != nil {
 		return fmt.Errorf("validate email: %w", err)
 	}
-	if err := app.prepareDynamoDB(ctx); err != nil {
-		return err
-	}
 
 	log.Println("[debug] try get user", email)
 	user, exists, err := app.GetUser(ctx, email)

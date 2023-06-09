@@ -30,20 +30,20 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	Email             Email        `dynamodb:"Email"`
-	Namespace         string       `dynamodb:"Namespace"`
-	IAMRoleARN        string       `dynamodb:"IAMRoleARN"`
-	Region            string       `dynamodb:"Region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards"`
-	Enabled           bool         `dynamodb:"Enabled"`
-	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime"`
-	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime"`
-	QuickSightUserARN string       `dynamodb:"QuickSightUserARN"`
+	Email             Email        `dynamodb:"Email" json:"email" yaml:"email"`
+	Namespace         string       `dynamodb:"Namespace" json:"namespace" yaml:"namespace"`
+	IAMRoleARN        string       `dynamodb:"IAMRoleARN" json:"iam_role_arn" yaml:"iam_role_arn"`
+	Region            string       `dynamodb:"Region" json:"region" yaml:"region"`
+	Dashboards        []*Dashboard `dynamodb:"Dashboards" json:"dashboards" yaml:"dashboards"`
+	Enabled           bool         `dynamodb:"Enabled" json:"-" yaml:"-"`
+	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" json:"-" yaml:"-"`
+	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" json:"-" yaml:"-"`
+	QuickSightUserARN string       `dynamodb:"QuickSightUserARN" json:"-" yaml:"-"`
 }
 
 type Dashboard struct {
 	Name        string
-	DashboardID string    `dynamodb:"DashboardID"`
+	DashboardID string    `dynamodb:"DashboardID" json:"dashboard_id" yaml:"dashboard_id"`
 	Expire      time.Time `dynamodb:"Expire,unixtime"`
 }
 
@@ -112,13 +112,16 @@ func (d *Dashboard) IsVisible() bool {
 
 func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, error) {
 	user := NewUser(email)
-	if err := app.ddbTable().Get("HashKey", user.HashKey).Range("SortKey", dynamo.Equal, user.SortKey).Limit(1).OneWithContext(ctx, user); err != nil {
-		if strings.Contains(err.Error(), "no item found") {
-			return user, false, nil
+	if app.isDDBMode() {
+		if err := app.ddbTable().Get("HashKey", user.HashKey).Range("SortKey", dynamo.Equal, user.SortKey).Limit(1).OneWithContext(ctx, user); err != nil {
+			if strings.Contains(err.Error(), "no item found") {
+				return user, false, nil
+			}
+			return nil, false, err
 		}
-		return nil, false, err
+		return user, true, nil
 	}
-	return user, true, nil
+	return user, false, errors.New("no ddb table mode not implemented")
 }
 
 func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {

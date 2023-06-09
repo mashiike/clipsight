@@ -20,6 +20,9 @@ type RegisterOption struct {
 }
 
 func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) error {
+	if !app.isDDBMode() {
+		return fmt.Errorf("register command is only supported in ddb mode")
+	}
 	if _, err := ParseIAMRoleARN(opt.IAMRoleARN); err != nil {
 		return fmt.Errorf("%s: %w", opt.IAMRoleARN, err)
 	}
@@ -27,9 +30,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 	if err := email.Validate(); err != nil {
 		return fmt.Errorf("validate email: %w", err)
 	}
-	if err := app.prepareDynamoDB(ctx); err != nil {
-		return err
-	}
+
 	log.Println("[debug] try get user", email)
 	user, exists, err := app.GetUser(ctx, email)
 	if err != nil {
