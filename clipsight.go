@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -58,11 +59,11 @@ func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
 
 // Management table for github.com/mashiike/clipsight
 type schema struct {
-	HashKey string `dynamo:"HashKey,hash"`
-	SortKey string `dynamo:"SortKey,range"`
+	HashKey string `dynamo:"HashKey,hash" ymal:"-" json:"hash_key"`
+	SortKey string `dynamo:"SortKey,range" ymal:"-" json:"sort_key"`
 
-	Revision int64     `dynamo:"Revision"`
-	TTL      time.Time `dynamo:"TTL,unixtime,omitempty"`
+	Revision int64     `dynamo:"Revision" yaml:"-" json:"-"`
+	TTL      time.Time `dynamo:"TTL,unixtime,omitempty" yaml:"expire,omitempty" json:"expire,omitempty"`
 }
 
 func (s *schema) IsExpire() bool {
@@ -203,4 +204,96 @@ func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID
 		return fmt.Errorf("HTTP Status %d", output.Status)
 	}
 	return nil
+}
+
+type ChangeInfo struct {
+	Before *User
+	After  *User
+}
+
+func (c *ChangeInfo) String() string {
+	var builder strings.Builder
+	builder.WriteString("QuickSightUser: ")
+	var userName string
+	if c.Before != nil {
+		userName, _ = c.Before.QuickSightUserName()
+	}
+	if userName == "" && c.After != nil {
+		userName, _ = c.After.QuickSightUserName()
+	}
+	builder.WriteString(userName)
+	builder.WriteString("\n")
+	diffStr, err := c.Before.Diff(c.After)
+	if err != nil {
+		fmt.Fprintf(&builder, "diff print error: %s\n", err)
+	} else {
+		builder.WriteString(diffStr)
+	}
+	builder.WriteString("\n")
+	return builder.String()
+}
+
+func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config, silent bool) ([]*ChangeInfo, error) {
+	log.Println("[debug] start SyncConfigToDynamoDB")
+	usersByQuickSightUserName := make(map[string]*User)
+	for _, user := range cfg.Users {
+		userName, err := user.QuickSightUserName()
+		if err != nil {
+			return nil, fmt.Errorf("invalid user: %w", err)
+		}
+		usersByQuickSightUserName[userName] = user
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	ddbUserCh, backgroundWaiter := app.ListUsers(ctx)
+	defer func() {
+		cancel()
+		backgroundWaiter()
+	}()
+	changes := make([]*ChangeInfo, 0)
+	exists := make(map[string]bool, len(cfg.Users))
+	for ddbUser := range ddbUserCh {
+		userName, err := ddbUser.QuickSightUserName()
+		if err != nil {
+			return nil, err
+		}
+		exists[userName] = true
+		user, ok := usersByQuickSightUserName[userName]
+		if !ok {
+			if !silent {
+				log.Printf("[info] delete user: %s", userName)
+			}
+			changes = append(changes, &ChangeInfo{
+				Before: ddbUser,
+				After:  nil,
+			})
+			continue
+		}
+		if ddbUser.Equals(user) {
+			continue
+		}
+		if !silent {
+			log.Printf("[info] change user: %s", userName)
+		}
+		changes = append(changes, &ChangeInfo{
+			Before: ddbUser,
+			After:  user,
+		})
+	}
+	for _, user := range cfg.Users {
+		userName, err := user.QuickSightUserName()
+		if err != nil {
+			return nil, fmt.Errorf("invalid user: %w", err)
+		}
+		if exists[userName] {
+			continue
+		}
+		if !silent {
+			log.Printf("[info] create user: %s", userName)
+		}
+		changes = append(changes, &ChangeInfo{
+			Before: nil,
+			After:  user,
+		})
+	}
+	return changes, nil
 }

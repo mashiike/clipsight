@@ -2,6 +2,7 @@ package clipsight
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"net/mail"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/guregu/dynamo"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 type Email string
@@ -31,21 +34,21 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	Email             Email        `dynamodb:"Email" yaml:"email"`
-	Namespace         string       `dynamodb:"Namespace" yaml:"namespace"`
-	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn"`
-	Region            string       `dynamodb:"Region" yaml:"region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards"`
-	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled"`
-	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime"`
-	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime"`
-	QuickSightUserARN string       `dynamodb:"QuickSightUserARN"`
+	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
+	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
+	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
+	Region            string       `dynamodb:"Region" yaml:"region" json:"region"`
+	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
+	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
+	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
+	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
+	QuickSightUserARN string       `dynamodb:"QuickSightUserARN" yaml:"-" json:"-"`
 }
 
 type Dashboard struct {
-	Name        string    `yaml:"name,omitempty"`
-	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id"`
-	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire"`
+	Name        string    `yaml:"name,omitempty" json:"name,omitempty"`
+	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id" json:"dashboard_id"`
+	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire" json:"expire,omitempty"`
 }
 
 func (u *User) Restrict() error {
@@ -124,6 +127,74 @@ func (u *User) IsActive() bool {
 		return false
 	}
 	return u.Enabled
+}
+
+func (u *User) Diff(user *User) (string, error) {
+	current, err := json.MarshalIndent(u, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	other, err := json.MarshalIndent(user, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	currentLines := difflib.SplitLines(string(current))
+	otherLines := difflib.SplitLines(string(other))
+	diff := difflib.UnifiedDiff{
+		A:       currentLines,
+		B:       otherLines,
+		Context: len(currentLines) + len(otherLines),
+	}
+
+	text, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return "", err
+	}
+	return text, nil
+}
+
+func (u *User) Equals(user *User) bool {
+	if u == nil || user == nil {
+		return u == nil && user == nil
+	}
+	if u.Email != user.Email {
+		return false
+	}
+	if u.Namespace != user.Namespace {
+		return false
+	}
+	if u.IAMRoleARN != user.IAMRoleARN {
+		return false
+	}
+	if u.Region != user.Region {
+		return false
+	}
+	if len(u.Dashboards) != len(user.Dashboards) {
+		return false
+	}
+	// check dashboard element match by DashboardID
+	for _, d := range u.Dashboards {
+		found := false
+		for _, d2 := range user.Dashboards {
+			if d.DashboardID != d2.DashboardID {
+				continue
+			}
+			found = true
+			if d.Expire.IsZero() != d2.Expire.IsZero() {
+				return false
+			}
+			if !d.Expire.IsZero() {
+				if d.Expire.Unix() != d2.Expire.Unix() {
+					return false
+				}
+			}
+			break
+		}
+		if !found {
+			return false
+		}
+	}
+	return u.Enabled == user.Enabled
 }
 
 func NewUser(email Email) *User {
@@ -267,6 +338,33 @@ func (app *ClipSight) NewQuickSightClientWithUser(ctx context.Context, user *Use
 	})
 	awsCfgV2.Credentials = creds
 	return quicksight.NewFromConfig(awsCfgV2), nil
+}
+
+func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
+	ch := make(chan *User, 100)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			log.Println("[debug] list users done")
+			wg.Done()
+		}()
+		log.Println("[debug] list users start")
+		iter := app.ddbTable().Scan().Iter()
+		for {
+			var user User
+			isContinue := iter.NextWithContext(ctx, &user)
+			if !isContinue {
+				break
+			}
+			ch <- &user
+		}
+		if err := iter.Err(); err != nil {
+			log.Printf("[error] list users: %s", err)
+		}
+		close(ch)
+	}()
+	return ch, wg.Wait
 }
 
 type contextKey string

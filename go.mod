@@ -14,11 +14,13 @@ require (
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/logutils v1.1.2
 	github.com/fujiwara/ridge v0.6.1
+	github.com/google/go-cmp v0.5.9
 	github.com/guregu/dynamo v1.19.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mashiike/accesslogger v0.2.0
 	github.com/mashiike/google-oidc-middleware v0.1.0
+	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.2
 	go.mozilla.org/sops/v3 v3.7.3
 	gopkg.in/yaml.v3 v3.0.1
@@ -97,6 +99,7 @@ require (
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
+	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/shogo82148/go-retry v1.1.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/thanhpk/randstr v1.0.6 // indirect
