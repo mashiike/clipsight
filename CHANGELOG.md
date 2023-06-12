@@ -1,4 +1,8 @@
 # Changelog
+## [v0.2.3](https://github.com/mashiike/clipsight/compare/v0.2.2...v0.2.3) - 2023-06-12
+- fix userName is no mask by @mashiike in https://github.com/mashiike/clipsight/pull/82
+- Bump github.com/stretchr/testify from 1.8.2 to 1.8.4 by @dependabot in https://github.com/mashiike/clipsight/pull/77
+
 ## [v0.2.1](https://github.com/mashiike/clipsight/compare/v0.2.0...v0.2.1) - 2023-06-12
 - fix .yml can load by @mashiike in https://github.com/mashiike/clipsight/pull/75
 
