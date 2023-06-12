@@ -11,13 +11,22 @@ type PlanOption struct {
 }
 
 func (app *ClipSight) RunPlan(ctx context.Context, opt *PlanOption) error {
+	_, err := app.runPlan(ctx, opt)
+	return err
+}
+
+func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeInfo, error) {
 	cfg, err := LoadConfig(opt.ConfigPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	changes, err := app.PlanSyncConfigToDynamoDB(ctx, cfg, opt.Silent)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if len(changes) == 0 {
+		fmt.Println("No changes")
+		return nil, nil
 	}
 	var created, deleted int
 	for _, change := range changes {
@@ -30,5 +39,5 @@ func (app *ClipSight) RunPlan(ctx context.Context, opt *PlanOption) error {
 		fmt.Println(change)
 	}
 	fmt.Printf("\tcreated: %d, changes: %d, deleted: %d\n\n", created, len(changes)-created-deleted, deleted)
-	return nil
+	return changes, nil
 }

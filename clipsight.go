@@ -233,6 +233,21 @@ func (c *ChangeInfo) String() string {
 	return builder.String()
 }
 
+func (c *ChangeInfo) NeedRegister() bool {
+	if c.After == nil {
+		return false
+	}
+	return !c.Before.Equals(c.After)
+}
+
+func (c *ChangeInfo) NeedPermissionModify() bool {
+	return !c.Before.EqualDashboardPermissions(c.After)
+}
+
+func (c *ChangeInfo) NeedDeregister() bool {
+	return c.After == nil
+}
+
 func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config, silent bool) ([]*ChangeInfo, error) {
 	log.Println("[debug] start SyncConfigToDynamoDB")
 	usersByQuickSightUserName := make(map[string]*User)
@@ -252,6 +267,9 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 	changes := make([]*ChangeInfo, 0)
 	exists := make(map[string]bool, len(cfg.Users))
 	for ddbUser := range ddbUserCh {
+		if !ddbUser.IsActive() {
+			continue
+		}
 		userName, err := ddbUser.QuickSightUserName()
 		if err != nil {
 			return nil, err
@@ -268,7 +286,7 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 			})
 			continue
 		}
-		if ddbUser.Equals(user) {
+		if ddbUser.Equals(user) && ddbUser.EqualDashboardPermissions(user) {
 			continue
 		}
 		if !silent {
@@ -280,6 +298,9 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 		})
 	}
 	for _, user := range cfg.Users {
+		if !user.IsActive() {
+			continue
+		}
 		userName, err := user.QuickSightUserName()
 		if err != nil {
 			return nil, fmt.Errorf("invalid user: %w", err)

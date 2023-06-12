@@ -20,6 +20,7 @@ type CLI struct {
 	Revoke   *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
 	Serve    *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
 	Plan     *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
+	Apply    *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
 	Version  struct{}        `cmd:"" help:"Show version"`
 }
 
@@ -66,6 +67,8 @@ func (app *ClipSight) Dispatch(ctx context.Context, command string, cli *CLI) er
 		return app.RunRevoke(ctx, cli.Revoke)
 	case "plan":
 		return app.RunPlan(ctx, cli.Plan)
+	case "apply":
+		return app.RunApply(ctx, cli.Apply)
 	case "version":
 		fmt.Printf("clipsight %s\n", Version)
 		return nil

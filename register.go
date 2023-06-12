@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // RegisterOption is Options for CLI Serve command
@@ -17,6 +15,7 @@ type RegisterOption struct {
 	Region                 string    `help:"quicksight user region" env:"AWS_DEFAULT_REGION" required:""`
 	RegisterQuickSightUser bool      `name:"register-quicksight-user" help:"if quicksight user not exists, register this"`
 	ExpireDate             time.Time `help:"Expiration date for this user (RFC3399)"`
+	Disabled               bool      `help:"disable user"`
 }
 
 func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) error {
@@ -42,13 +41,14 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 	user.Namespace = opt.Namespace
 	user.IAMRoleARN = opt.IAMRoleARN
 	user.Region = opt.Region
-	user.Enabled = true
+	user.Enabled = !opt.Disabled
 	if !opt.ExpireDate.IsZero() {
 		user.TTL = opt.ExpireDate
+	} else {
+		user.TTL = time.Time{}
 	}
 
 	log.Println("[debug] try get quicksight user")
-	app.sts.AssumeRole(ctx, &sts.AssumeRoleInput{})
 	qsUser, exists, err := app.DescribeQuickSightUser(ctx, user)
 	if err != nil {
 		return fmt.Errorf("describe quicksight user: %w", err)
