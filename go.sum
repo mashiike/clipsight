@@ -239,8 +239,6 @@ github.com/mashiike/accesslogger v0.2.0 h1:NRDs4hxJDTwl/pOzf2Q5xkG7NfZMaTZk+xLQ4
 github.com/mashiike/accesslogger v0.2.0/go.mod h1:ABz+ZD/gjU2LGLeACmjMuprYVo1DgKUd6WbYhI0oags=
 github.com/mashiike/google-oidc-middleware v0.1.0 h1:WlRSbeR6Acd8zlCvHus/AykKitchIOCEThtNzrZ0nb0=
 github.com/mashiike/google-oidc-middleware v0.1.0/go.mod h1:wHqfsYDKO/PyFch6Kr4Tx29df8lN2TUZ99v7oiZ5C2E=
-github.com/mashiike/slogutils v0.2.0 h1:bJmNylmNgr6bCC3xRbRhXeDp8LPWU9yzSU9Fq/fU7UA=
-github.com/mashiike/slogutils v0.2.0/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
 github.com/mashiike/slogutils v0.2.1 h1:qJ9eSuINlYwxj6mF2G71THqVBNEP0FiXsLZ4n0/+myc=
 github.com/mashiike/slogutils v0.2.1/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
@@ -333,8 +331,9 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
-github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ8=
 github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
+github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
+github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/thanhpk/randstr v1.0.6 h1:psAOktJFD4vV9NEVb3qkhRSMvYh4ORRaj1+w/hn4B+o=
 github.com/thanhpk/randstr v1.0.6/go.mod h1:M/H2P1eNLZzlDwAzpkkkUvoyNNMbzRGhESZuEQk3r0U=
 github.com/urfave/cli/v2 v2.2.0/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=

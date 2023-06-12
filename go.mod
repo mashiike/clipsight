@@ -24,7 +24,7 @@ require (
 	github.com/mashiike/slogutils v0.2.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/sebdah/goldie/v2 v2.5.3
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	gopkg.in/yaml.v3 v3.0.1
