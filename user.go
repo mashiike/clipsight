@@ -287,7 +287,9 @@ func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, er
 }
 
 func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {
-	user = user.FillKey()
+	if err := user.Restrict(); err != nil {
+		return err
+	}
 	rev := user.Revision
 	user.Revision++
 	if user.CreatedAt.IsZero() {
