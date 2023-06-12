@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: mashiike/clipsight@v0
+      - uses: mashiike/clipsight@main
         with:
           version: v0.2.0
       - run: |
           clipsight version 2>&1 | fgrep v0.2.0
-      - uses: mashiike/clipsight@v0
+      - uses: mashiike/clipsight@main
         with:
           version: latest
       - run: |
