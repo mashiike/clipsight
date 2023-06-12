@@ -3,26 +3,35 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/fatih/color"
-	"github.com/fujiwara/logutils"
+	"github.com/mashiike/slogutils"
+	"golang.org/x/exp/slog"
 )
 
 type CLI struct {
-	LogLevel string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
-	DDBTable string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
-	Register *RegisterOption `cmd:"" help:"Register user"`
-	Grant    *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
-	Revoke   *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
-	Serve    *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
-	Plan     *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
-	Apply    *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
-	Version  struct{}        `cmd:"" help:"Show version"`
+	LogLevel  string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
+	DDBTable  string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
+	MaskEmail bool            `help:"mask email address in log"`
+	Register  *RegisterOption `cmd:"" help:"Register user"`
+	Grant     *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
+	Revoke    *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
+	Serve     *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
+	Plan      *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
+	Apply     *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
+	Version   struct{}        `cmd:"" help:"Show version"`
 }
+
+var (
+	LevelDebug  slog.Level = slog.LevelDebug
+	LevelInfo              = slog.LevelInfo
+	LevelNotice            = slog.Level(slog.LevelInfo + 2)
+	LevelWarn              = slog.LevelWarn
+	LevelError             = slog.LevelError
+)
 
 func RunCLI(ctx context.Context, args []string) error {
 	var cli CLI
@@ -34,19 +43,60 @@ func RunCLI(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	filter := &logutils.LevelFilter{
-		Levels: []logutils.LogLevel{"debug", "info", "notice", "warn", "error"},
-		ModifierFuncs: []logutils.ModifierFunc{
-			logutils.Color(color.FgHiBlack),
-			nil,
-			logutils.Color(color.FgHiBlue),
-			logutils.Color(color.FgYellow),
-			logutils.Color(color.FgRed, color.BgBlack),
-		},
-		MinLevel: logutils.LogLevel(cli.LogLevel),
-		Writer:   os.Stderr,
+	var minLevel slog.Level
+	switch strings.ToLower(cli.LogLevel) {
+	case "debug":
+		minLevel = slog.LevelDebug
+	case "info":
+		minLevel = slog.LevelInfo
+	case "notice":
+		minLevel = slog.Level(slog.LevelInfo + 2)
+	case "warn":
+		minLevel = slog.LevelWarn
+	case "error":
+		minLevel = slog.LevelError
+	default:
+		return fmt.Errorf("unknown log level: %s", cli.LogLevel)
 	}
-	log.SetOutput(filter)
+
+	logMiddlwareOpts := slogutils.MiddlewareOptions{
+		ModifierFuncs: map[slog.Level]slogutils.ModifierFunc{
+			slog.LevelDebug: slogutils.Color(color.FgBlack),
+			slog.LevelInfo:  nil,
+			LevelNotice:     slogutils.Color(color.FgBlue),
+			slog.LevelWarn:  slogutils.Color(color.FgYellow),
+			slog.LevelError: slogutils.Color(color.FgRed, color.Bold),
+		},
+		Writer: os.Stderr,
+		HandlerOptions: &slog.HandlerOptions{
+			Level: minLevel,
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if strings.Contains(a.Key, "email") && cli.MaskEmail {
+					return slog.String("email", "********")
+				}
+				if a.Key == slog.LevelKey {
+					level := a.Value.Any().(slog.Level)
+					switch {
+					case level < LevelInfo:
+						a.Value = slog.StringValue("debug")
+					case level < LevelNotice:
+						a.Value = slog.StringValue("info")
+					case level < LevelWarn:
+						a.Value = slog.StringValue("notice")
+					case level < LevelError:
+						a.Value = slog.StringValue("warn")
+					default:
+						a.Value = slog.StringValue("error")
+					}
+				}
+				return a
+			},
+		},
+	}
+	slog.SetDefault(slog.New(slogutils.NewMiddleware(slog.NewJSONHandler, logMiddlwareOpts)).With(
+		slog.String("app", "clipsight"),
+		slog.String("version", Version),
+	))
 	app, err := New(ctx, cli.DDBTable)
 	if err != nil {
 		return err
