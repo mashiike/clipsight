@@ -1,0 +1,23 @@
+name: action test
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  install:
+    name: action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: mashiike/clipsight@main
+        with:
+          version: v0.1.3
+      - run: |
+          clipsight version 2>&1 | fgrep v0.1.3
+      - uses: mashiike/clipsight@main
+        with:
+          version: latest
+      - run: |
+          clipsight version 2>&1 | fgrep v0

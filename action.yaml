@@ -1,0 +1,43 @@
+inputs:
+  version:
+    description: "A version to install ClipSight"
+    default: latest
+    required: false
+  github-token:
+    description: "The token used when calling GitHub API"
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        github_token: ${{ inputs.github-token }}
+      run: |
+        set -e
+        VERSION="${{ inputs.version }}"
+        api_request_args=("-sS")
+        if [[ -n "$github_token" ]]; then
+          api_request_args=("${api_request_args[@]}" -H "authorization: token $github_token")
+        fi
+        if [ "${VERSION}" = "latest" ]; then
+          DOWNLOAD_URL=$(curl "${api_request_args[@]}" https://api.github.com/repos/mashiike/clipsight/releases | jq -r '[.[]|select(.tag_name > "v0")|select(.prerelease==false)][0].assets[].browser_download_url|select(match("linux.amd64."))')
+        else
+          DOWNLOAD_URL=https://github.com/mashiike/clipsight/releases/download/${VERSION}/clipsight_${VERSION:1}_linux_amd64.tar.gz
+        fi
+        mkdir -p ${RUNNER_TOOL_CACHE}/clipsight
+        cd /tmp
+        curl -sfLO ${DOWNLOAD_URL}
+        if [[ "${DOWNLOAD_URL}" =~ \.tar\.gz$ ]]; then
+          FILENAME=$(basename $DOWNLOAD_URL .tar.gz)
+          tar xzvf ${FILENAME}.tar.gz
+          sudo install clipsight ${RUNNER_TOOL_CACHE}/clipsight/clipsight
+        elif [[ "${DOWNLOAD_URL}" =~ \.zip$ ]]; then
+          FILENAME=$(basename $DOWNLOAD_URL .zip)
+          unzip ${FILENAME}.zip
+          sudo install ${FILENAME} ${RUNNER_TOOL_CACHE}/clipsight/clipsight
+        fi
+
+        echo "Adding ${RUNNER_TOOL_CACHE}/clipsight to path..."
+        echo "${RUNNER_TOOL_CACHE}/clipsight" >> $GITHUB_PATH
+        "${RUNNER_TOOL_CACHE}/clipsight/clipsight" version
