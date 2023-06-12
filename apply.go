@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"golang.org/x/exp/slog"
 )
 
 type ApplyOption struct {
@@ -47,6 +48,7 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 		} else {
 			email = c.After.Email
 		}
+		slog.DebugCtx(ctx, "change target dump", slog.String("email", email.String()))
 		log.Printf("[debug] user: %s", email)
 		if c.NeedRegister() {
 			log.Printf("[debug] need register: %s", c.After.Email)
@@ -56,7 +58,6 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 				IAMRoleARN:             c.After.IAMRoleARN,
 				Region:                 c.After.Region,
 				RegisterQuickSightUser: true,
-				Disabled:               !c.After.Enabled,
 				ExpireDate:             c.After.TTL,
 			}); err != nil {
 				return err

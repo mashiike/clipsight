@@ -1,0 +1,21 @@
+@@ -1 +1,19 @@
+-null
++{
++  "expire": "0001-01-01T00:00:00Z",
++  "id": "ce8efebf37df747af2e3bef0821c0bfe0684a3688dce8e39cb6e9a7c4006b4b6",
++  "email": "********",
++  "namespace": "default",
++  "iam_role_arn": "arn:aws:iam::123456789012:role/external",
++  "region": "ap-northeast-1",
++  "dashboards": [
++    {
++      "dashboard_id": "12345678-1234-1234-1234-123456789012",
++      "expire": "2021-01-01T00:00:00Z"
++    },
++    {
++      "dashboard_id": "00000000-0000-0000-0000-000000000000",
++      "expire": "0001-01-01T00:00:00Z"
++    }
++  ],
++  "enabled": true
++}

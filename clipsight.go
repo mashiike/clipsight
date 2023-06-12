@@ -212,6 +212,14 @@ type ChangeInfo struct {
 }
 
 func (c *ChangeInfo) String() string {
+	return c.diffString(true)
+}
+
+func (c *ChangeInfo) UnmaskString() string {
+	return c.diffString(false)
+}
+
+func (c *ChangeInfo) diffString(mask bool) string {
 	var builder strings.Builder
 	builder.WriteString("QuickSightUser: ")
 	var userName string
@@ -223,7 +231,7 @@ func (c *ChangeInfo) String() string {
 	}
 	builder.WriteString(userName)
 	builder.WriteString("\n")
-	diffStr, err := c.Before.Diff(c.After)
+	diffStr, err := c.Before.Diff(c.After, mask)
 	if err != nil {
 		fmt.Fprintf(&builder, "diff print error: %s\n", err)
 	} else {

@@ -46,9 +46,16 @@ func TestUser__Diff_Change(t *testing.T) {
 		Enabled: true,
 	}
 	other.Restrict()
-	actual, err := user.Diff(other)
-	require.NoError(t, err)
-	g.Assert(t, "diff_change", []byte(actual))
+	t.Run("nomask", func(t *testing.T) {
+		actual, err := user.Diff(other, false)
+		require.NoError(t, err)
+		g.Assert(t, "diff_change", []byte(actual))
+	})
+	t.Run("mask", func(t *testing.T) {
+		actual, err := user.Diff(other, true)
+		require.NoError(t, err)
+		g.Assert(t, "diff_change_mask", []byte(actual))
+	})
 	require.False(t, user.Equals(other))
 }
 
@@ -71,9 +78,16 @@ func TestUser__Diff_Add(t *testing.T) {
 		Enabled: true,
 	}
 	user.Restrict()
-	actual, err := user.Diff(nil)
-	require.NoError(t, err)
-	g.Assert(t, "diff_add", []byte(actual))
+	t.Run("nomask", func(t *testing.T) {
+		actual, err := user.Diff(nil, false)
+		require.NoError(t, err)
+		g.Assert(t, "diff_add", []byte(actual))
+	})
+	t.Run("mask", func(t *testing.T) {
+		actual, err := user.Diff(nil, true)
+		require.NoError(t, err)
+		g.Assert(t, "diff_add_mask", []byte(actual))
+	})
 	require.False(t, user.Equals(nil))
 }
 
@@ -100,9 +114,16 @@ func TestUser__Diff_Delete(t *testing.T) {
 		Enabled: true,
 	}
 	other.Restrict()
-	actual, err := user.Diff(other)
-	require.NoError(t, err)
-	g.Assert(t, "diff_delete", []byte(actual))
+	t.Run("nomask", func(t *testing.T) {
+		actual, err := user.Diff(other, false)
+		require.NoError(t, err)
+		g.Assert(t, "diff_delete", []byte(actual))
+	})
+	t.Run("mask", func(t *testing.T) {
+		actual, err := user.Diff(other, true)
+		require.NoError(t, err)
+		g.Assert(t, "diff_delete_mask", []byte(actual))
+	})
 	require.False(t, user.Equals(other))
 }
 

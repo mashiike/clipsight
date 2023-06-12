@@ -146,17 +146,29 @@ func (u *User) IsActive() bool {
 	return u.Enabled
 }
 
-func (u *User) Diff(user *User) (string, error) {
+func (u *User) Diff(user *User, maskEmail bool) (string, error) {
 	current, err := json.MarshalIndent(u, "", "  ")
 	if err != nil {
 		return "", err
 	}
+	currentStr := string(current)
 	other, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
 		return "", err
 	}
-	currentLines := difflib.SplitLines(string(current))
-	otherLines := difflib.SplitLines(string(other))
+	otherStr := string(other)
+	if maskEmail {
+		var email Email
+		if u != nil {
+			email = u.Email
+		} else {
+			email = user.Email
+		}
+		currentStr = strings.ReplaceAll(currentStr, email.String(), "********")
+		otherStr = strings.ReplaceAll(otherStr, email.String(), "********")
+	}
+	currentLines := difflib.SplitLines(currentStr)
+	otherLines := difflib.SplitLines(otherStr)
 	diff := difflib.UnifiedDiff{
 		A:       currentLines,
 		B:       otherLines,
