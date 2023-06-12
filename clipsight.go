@@ -59,8 +59,8 @@ func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
 
 // Management table for github.com/mashiike/clipsight
 type schema struct {
-	HashKey string `dynamo:"HashKey,hash" ymal:"-" json:"hash_key"`
-	SortKey string `dynamo:"SortKey,range" ymal:"-" json:"sort_key"`
+	HashKey string `dynamo:"HashKey,hash" ymal:"-" json:"-"`
+	SortKey string `dynamo:"SortKey,range" ymal:"-" json:"-"`
 
 	Revision int64     `dynamo:"Revision" yaml:"-" json:"-"`
 	TTL      time.Time `dynamo:"TTL,unixtime,omitempty" yaml:"expire,omitempty" json:"expire,omitempty"`

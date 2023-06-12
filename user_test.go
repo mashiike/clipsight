@@ -28,6 +28,7 @@ func TestUser__Diff_Change(t *testing.T) {
 		},
 		Enabled: true,
 	}
+	user.Restrict()
 	other := &clipsight.User{
 		Email:      "fuga@example.com",
 		Region:     "ap-northeast-1",
@@ -44,6 +45,7 @@ func TestUser__Diff_Change(t *testing.T) {
 		},
 		Enabled: true,
 	}
+	other.Restrict()
 	actual, err := user.Diff(other)
 	require.NoError(t, err)
 	g.Assert(t, "diff_change", []byte(actual))
@@ -68,6 +70,7 @@ func TestUser__Diff_Add(t *testing.T) {
 		},
 		Enabled: true,
 	}
+	user.Restrict()
 	actual, err := user.Diff(nil)
 	require.NoError(t, err)
 	g.Assert(t, "diff_add", []byte(actual))
@@ -96,6 +99,7 @@ func TestUser__Diff_Delete(t *testing.T) {
 		},
 		Enabled: true,
 	}
+	other.Restrict()
 	actual, err := user.Diff(other)
 	require.NoError(t, err)
 	g.Assert(t, "diff_delete", []byte(actual))

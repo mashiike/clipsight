@@ -2,6 +2,7 @@ package clipsight
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ func (email Email) String() string {
 
 type User struct {
 	schema
+	ID                string       `dynamodb:"ID,hash" yaml:"id" json:"id"`
 	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
 	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
 	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
@@ -52,7 +54,21 @@ type Dashboard struct {
 	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire" json:"expire,omitempty"`
 }
 
+var (
+	emailHashSolt     string
+	emailHashSoltOnce sync.Once
+)
+
 func (u *User) Restrict() error {
+	if u.ID == "" {
+		emailHashSoltOnce.Do(func() {
+			emailHashSolt = os.Getenv("CLIPSIGHT_EMAIL_HASH_SOLT")
+			if emailHashSolt == "" {
+				emailHashSolt = "clipsight"
+			}
+		})
+		u.ID = fmt.Sprintf("%x", sha256.Sum256([]byte(emailHashSolt+u.Email.String())))
+	}
 	if u.Email == "" {
 		return errors.New("email is required")
 	}
