@@ -247,10 +247,13 @@ func (c *ChangeInfo) NeedRegister() bool {
 	if c.After == nil {
 		return false
 	}
-	return !c.Before.Equals(c.After)
+	return !c.Before.Equals(c.After) && c.After.Enabled
 }
 
 func (c *ChangeInfo) NeedPermissionModify() bool {
+	if c.After == nil {
+		return false
+	}
 	return !c.Before.EqualDashboardPermissions(c.After)
 }
 
@@ -286,7 +289,11 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 		}
 		exists[userName] = true
 		user, ok := usersByQuickSightUserName[userName]
-		if !ok {
+		delete := !ok
+		if ok {
+			delete = !user.IsActive()
+		}
+		if delete {
 			if !silent {
 				slog.InfoCtx(ctx, "plan delete user", slog.String("id", ddbUser.ID), slog.String("quick_sight_user_name", userName))
 			}
