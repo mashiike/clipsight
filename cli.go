@@ -125,11 +125,15 @@ func RunCLI(ctx context.Context, args []string) error {
 		slog.String("app", "clipsight"),
 		slog.String("version", Version),
 	))
+	cmd := strings.Fields(kctx.Command())[0]
+	if cmd == "version" {
+		fmt.Printf("clipsight %s\n", Version)
+		return nil
+	}
 	app, err := New(ctx, cli.DDBTable, cli.MaskEmail)
 	if err != nil {
 		return err
 	}
-	cmd := strings.Fields(kctx.Command())[0]
 	return app.Dispatch(ctx, cmd, &cli)
 }
 
@@ -148,7 +152,6 @@ func (app *ClipSight) Dispatch(ctx context.Context, command string, cli *CLI) er
 	case "apply":
 		return app.RunApply(ctx, cli.Apply)
 	case "version":
-		fmt.Printf("clipsight %s\n", Version)
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
