@@ -3,6 +3,9 @@
 ## [v0.2.1](https://github.com/mashiike/clipsight/compare/v0.2.0...v0.2.1) - 2023-06-12
 - fix .yml can load by @mashiike in https://github.com/mashiike/clipsight/pull/75
 
+## [v0.2.1](https://github.com/mashiike/clipsight/compare/v0.2.0...v0.2.1) - 2023-06-12
+- fix .yml can load by @mashiike in https://github.com/mashiike/clipsight/pull/75
+
 ## [v0.2.0](https://github.com/mashiike/clipsight/compare/v0.1.3...v0.2.0) - 2023-06-12
 - Bump golang.org/x/net from 0.5.0 to 0.7.0 by @dependabot in https://github.com/mashiike/clipsight/pull/41
 - Bump github.com/aws/aws-sdk-go from 1.44.180 to 1.44.249 by @dependabot in https://github.com/mashiike/clipsight/pull/62
