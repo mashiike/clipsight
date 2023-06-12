@@ -3,7 +3,8 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"golang.org/x/exp/slog"
 )
 
 type RevokeOption struct {
@@ -19,8 +20,7 @@ func (app *ClipSight) RunRevoke(ctx context.Context, opt *RevokeOption) error {
 	if err := app.prepareDynamoDB(ctx); err != nil {
 		return err
 	}
-
-	log.Println("[debug] try get user", email)
+	slog.DebugCtx(ctx, "try get user", slog.String("email", email.String()))
 	user, exists, err := app.GetUser(ctx, email)
 	if err != nil {
 		return fmt.Errorf("get user: %w", err)
@@ -34,7 +34,6 @@ func (app *ClipSight) RunRevoke(ctx context.Context, opt *RevokeOption) error {
 	if err := app.RevokeDashboardFromUser(ctx, user, opt.DashboardID); err != nil {
 		return err
 	}
-	log.Println("[notice] revoke dashboard", opt.DashboardID, "from", user.Email, "revision:", user.Revision)
-	log.Println("[debug] user:", user)
+	slog.Log(ctx, LevelNotice, "revoke dashboard", slog.String("dashboard_id", opt.DashboardID), slog.String("id", user.ID), slog.String("email", user.Email.String()), slog.Int64("revision", user.Revision))
 	return nil
 }

@@ -3,13 +3,13 @@ package clipsight
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"text/template"
 
 	gv "github.com/hashicorp/go-version"
 	"go.mozilla.org/sops/v3/decrypt"
+	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -39,7 +39,7 @@ func (c *VersionConstraint) Check(v string) bool {
 	}
 	version, err := gv.NewVersion(v)
 	if err != nil {
-		log.Printf("[warn] version is not semver: %s", v)
+		slog.Warn("version is not semver", slog.String("version", v))
 		return true
 	}
 	return c.Constraints.Check(version)
@@ -114,11 +114,11 @@ func LoadConfig(p string) (*Config, error) {
 	var config Config
 	for _, entity := range entities {
 		if entity.IsDir() {
-			log.Println("[debug] skip directory", entity.Name())
+			slog.Debug("skip directory", slog.String("entity_name", entity.Name()))
 			continue
 		}
 		if filepath.Ext(entity.Name()) != ".yaml" {
-			log.Println("[debug] skip file", entity.Name())
+			slog.Debug("skip non-yaml file", slog.String("entity_name", entity.Name()))
 			continue
 		}
 		c, err := loadConfigFile(filepath.Join(p, entity.Name()))

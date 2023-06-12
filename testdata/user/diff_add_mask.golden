@@ -2,7 +2,7 @@
 -{
 -  "expire": "0001-01-01T00:00:00Z",
 -  "id": "07b4803ae7e280464f58d6b345cef8824bde652f16c4c8ce0f927e41c2a1c76b",
--  "email": "hoge@example.com",
+-  "email": "********",
 -  "namespace": "external",
 -  "iam_role_arn": "arn:aws:iam::123456789012:role/external",
 -  "region": "ap-northeast-1",

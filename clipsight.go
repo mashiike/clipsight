@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/guregu/dynamo"
+	"golang.org/x/exp/slog"
 )
 
 var Version string = "current"
@@ -25,13 +25,14 @@ var Version string = "current"
 type ClipSight struct {
 	ddbTableName string
 	awsAccountID string
+	maskEmail    bool
 	qs           *quicksight.Client
 	sts          *sts.Client
 	ddb          *dynamo.DB
 }
 
 // New returns initialized application instance
-func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
+func New(ctx context.Context, ddbTableName string, maskEmail bool) (*ClipSight, error) {
 	awsCfgV2, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -52,6 +53,7 @@ func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
 		awsAccountID: *getCallerIdentityOutput.Account,
 		qs:           quicksight.NewFromConfig(awsCfgV2),
 		sts:          stsClient,
+		maskEmail:    maskEmail,
 		ddb:          dynamo.New(sess),
 	}
 	return app, nil
@@ -59,8 +61,8 @@ func New(ctx context.Context, ddbTableName string) (*ClipSight, error) {
 
 // Management table for github.com/mashiike/clipsight
 type schema struct {
-	HashKey string `dynamo:"HashKey,hash" ymal:"-" json:"hash_key"`
-	SortKey string `dynamo:"SortKey,range" ymal:"-" json:"sort_key"`
+	HashKey string `dynamo:"HashKey,hash" ymal:"-" json:"-"`
+	SortKey string `dynamo:"SortKey,range" ymal:"-" json:"-"`
 
 	Revision int64     `dynamo:"Revision" yaml:"-" json:"-"`
 	TTL      time.Time `dynamo:"TTL,unixtime,omitempty" yaml:"expire,omitempty" json:"expire,omitempty"`
@@ -78,7 +80,7 @@ func (app *ClipSight) ddbTable() dynamo.Table {
 }
 
 func (app *ClipSight) prepareDynamoDB(ctx context.Context) error {
-	log.Println("[debug] try prepare DynaamoDB ")
+	slog.DebugCtx(ctx, "try prepare DynamoDB")
 	table := app.ddbTable()
 	if _, err := table.Describe().RunWithContext(ctx); err != nil {
 		var rnf *dynamodb.ResourceNotFoundException
@@ -106,7 +108,7 @@ func (app *ClipSight) prepareDynamoDB(ctx context.Context) error {
 }
 
 func (app *ClipSight) DescribeDashboard(ctx context.Context, dashboardID string) (*types.Dashboard, bool, error) {
-	log.Printf("[debug] try DescribeDashboard(%s, %s)", app.awsAccountID, dashboardID)
+	slog.DebugCtx(ctx, "try DescribeDashboard(%s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID))
 	output, err := app.qs.DescribeDashboard(ctx, &quicksight.DescribeDashboardInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		DashboardId:  aws.String(dashboardID),
@@ -127,7 +129,7 @@ func (app *ClipSight) DescribeDashboard(ctx context.Context, dashboardID string)
 }
 
 func (app *ClipSight) DescribeDashboardParmissions(ctx context.Context, dashboardID string) ([]types.ResourcePermission, error) {
-	log.Printf("[debug] try DescribeDashboardPermissions(%s, %s)", app.awsAccountID, dashboardID)
+	slog.DebugCtx(ctx, "try DescribeDashboardParmissions(%s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID))
 	output, err := app.qs.DescribeDashboardPermissions(ctx, &quicksight.DescribeDashboardPermissionsInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		DashboardId:  aws.String(dashboardID),
@@ -152,7 +154,7 @@ func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID 
 			return nil
 		}
 	}
-	log.Printf("[debug] try GrantDashboardParmission(%s, %s, %s)", app.awsAccountID, dashboardID, quickSightUserARN)
+	slog.DebugCtx(ctx, "try GrantDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("quick_sight_user_arn", quickSightUserARN))
 	output, err := app.qs.UpdateDashboardPermissions(ctx, &quicksight.UpdateDashboardPermissionsInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		DashboardId:  aws.String(dashboardID),
@@ -191,7 +193,7 @@ func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID
 	if len(revokePermissions) == 0 {
 		return nil
 	}
-	log.Printf("[debug] try RevokeDashboardParmission(%s, %s, %s)", app.awsAccountID, dashboardID, quickSightUserARN)
+	slog.DebugCtx(ctx, "try RevokeDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("quick_sight_user_arn", quickSightUserARN))
 	output, err := app.qs.UpdateDashboardPermissions(ctx, &quicksight.UpdateDashboardPermissionsInput{
 		AwsAccountId:      aws.String(app.awsAccountID),
 		DashboardId:       aws.String(dashboardID),
@@ -212,6 +214,14 @@ type ChangeInfo struct {
 }
 
 func (c *ChangeInfo) String() string {
+	return c.diffString(true)
+}
+
+func (c *ChangeInfo) UnmaskString() string {
+	return c.diffString(false)
+}
+
+func (c *ChangeInfo) diffString(mask bool) string {
 	var builder strings.Builder
 	builder.WriteString("QuickSightUser: ")
 	var userName string
@@ -223,7 +233,7 @@ func (c *ChangeInfo) String() string {
 	}
 	builder.WriteString(userName)
 	builder.WriteString("\n")
-	diffStr, err := c.Before.Diff(c.After)
+	diffStr, err := c.Before.Diff(c.After, mask)
 	if err != nil {
 		fmt.Fprintf(&builder, "diff print error: %s\n", err)
 	} else {
@@ -249,7 +259,7 @@ func (c *ChangeInfo) NeedDeregister() bool {
 }
 
 func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config, silent bool) ([]*ChangeInfo, error) {
-	log.Println("[debug] start SyncConfigToDynamoDB")
+	slog.DebugCtx(ctx, "start PlanSyncConfigToDynamoDB")
 	usersByQuickSightUserName := make(map[string]*User)
 	for _, user := range cfg.Users {
 		userName, err := user.QuickSightUserName()
@@ -278,7 +288,7 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 		user, ok := usersByQuickSightUserName[userName]
 		if !ok {
 			if !silent {
-				log.Printf("[info] delete user: %s", userName)
+				slog.InfoCtx(ctx, "plan delete user", slog.String("id", ddbUser.ID), slog.String("quick_sight_user_name", userName))
 			}
 			changes = append(changes, &ChangeInfo{
 				Before: ddbUser,
@@ -290,7 +300,7 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 			continue
 		}
 		if !silent {
-			log.Printf("[info] change user: %s", userName)
+			slog.InfoCtx(ctx, "plan change user", slog.String("id", ddbUser.ID), slog.String("quick_sight_user_name", userName))
 		}
 		changes = append(changes, &ChangeInfo{
 			Before: ddbUser,
@@ -309,7 +319,7 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 			continue
 		}
 		if !silent {
-			log.Printf("[info] create user: %s", userName)
+			slog.InfoCtx(ctx, "plan create user", slog.String("id", user.ID), slog.String("quick_sight_user_name", userName))
 		}
 		changes = append(changes, &ChangeInfo{
 			Before: nil,

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,9 +19,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	validator "github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/fujiwara/ridge"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mashiike/accesslogger"
 	googleoidcmiddleware "github.com/mashiike/google-oidc-middleware"
+	"github.com/mashiike/slogutils"
+	"golang.org/x/exp/slog"
 )
 
 // ServeOption is Options for CLI Serve command
@@ -66,7 +68,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		if err := tpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
 			"BaseURL": opt.BaseURL,
 		}); err != nil {
-			log.Println("[error] failed execute template ERROR CODE 001:", err)
+			slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
 			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
 		}
 		w.Header().Set("Content-Type", "text/html")
@@ -85,11 +87,17 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			})
 			return
 		}
+		slog.InfoCtx(ctx, "accume role", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("iam_role", user.IAMRoleARN))
 		qs, err := app.NewQuickSightClientWithUser(ctx, user)
 		if err != nil {
-			log.Printf("[error] can not initialize QuickSightclient: %v", err)
+			slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
+				slog.String("user_id", user.ID),
+				slog.String("error_code", "002"),
+				slog.String("detail", err.Error()),
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "002",
 				"error": "can not initialize",
 			})
 			return
@@ -112,10 +120,22 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				},
 				SessionLifetimeInMinutes: aws.Int64(60),
 			})
+			slog.InfoCtx(ctx, "generate embed url",
+				slog.String("user_id", user.ID),
+				slog.String("email", user.Email.String()),
+				slog.String("quick_sight_user_arn", user.QuickSightUserARN),
+				slog.String("dashboard_id", dashbord.DashboardID),
+				slog.String("dashboard_name", dashbord.Name),
+			)
 			if err != nil {
-				log.Println("[error]", err)
+				slog.ErrorCtx(r.Context(), "failed generate embed url",
+					slog.String("user_id", user.ID),
+					slog.String("error_code", "003"),
+					slog.String("detail", err.Error()),
+				)
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]interface{}{
+					"code":  "003",
 					"error": "can not get embeded url",
 				})
 				return
@@ -132,8 +152,46 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		})
 	})
 
-	accessLoggingMiddleware := accesslogger.New(accesslogger.CombinedDLogger(os.Stderr))
-
+	accessLoggingMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l := accesslogger.NewAccessLog(r)
+			reqId := r.Header.Get("X-Request-Id")
+			if reqId == "" {
+				reqId = uuid.New().String()
+			}
+			ctx := slogutils.With(r.Context(), slog.String("request_id", reqId))
+			responseWriter := &accesslogger.ResponseWriter{
+				ResponseWriter: w,
+			}
+			r = r.WithContext(ctx)
+			defer func() {
+				err := recover()
+				l = l.WriteResponseInfo(responseWriter)
+				slog.Log(r.Context(), LevelNotice, l.Request,
+					slog.String("request_id", reqId),
+					slog.String("remote_addr", l.RemoteAddr),
+					slog.String("accessed_at", l.AccessedAt.Format("02/Jan/2006:15:04:05 -0700")),
+					slog.Int("status_code", l.StatusCode),
+					slog.Int("body_byte_sent", l.BodyByteSent),
+					slog.String("referer", l.Referer),
+					slog.String("user_agent", l.UserAgent),
+					slog.Int64("response_time_microseconds", l.ResponseTime),
+					slog.Int64("first_sent_time_microseconds", l.FirstSentTime),
+					slog.String("host", r.Host),
+					slog.String("method", r.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("proto", r.Proto),
+					slog.String("x_amzn_trace_id", r.Header.Get("X-Amzn-Trace-Id")),
+					slog.String("x_amz_cf_id", r.Header.Get("X-Amz-Cf-Id")),
+					slog.String("cloudfront_viewer_country", r.Header.Get("CloudFront-Viewer-Country")),
+				)
+				if err != nil {
+					panic(err)
+				}
+			}()
+			next.ServeHTTP(responseWriter, r)
+		})
+	}
 	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
 		accessLoggingMiddleware(
 			authMiddleware(
@@ -148,8 +206,8 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 	autholization := func(w http.ResponseWriter, r *http.Request, next http.Handler, email Email) {
 		user, ok, err := app.GetUser(ctx, email)
 		if err != nil {
-			log.Printf("[error] ERROR CODE 002: %v", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
+			slog.ErrorCtx(r.Context(), "failed get user", slog.String("error_code", "004"), slog.String("detail", err.Error()))
+			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 004", http.StatusInternalServerError)
 			return
 		}
 		if !ok {
@@ -179,13 +237,13 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return authenticationMiddleware(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					//auth check
-					log.Println("[debug] get claim")
+					slog.DebugCtx(r.Context(), "get claim")
 					claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
 					if !ok {
 						http.NotFound(w, r)
 						return
 					}
-					log.Println("[debug] check email")
+					slog.DebugCtx(r.Context(), "check email")
 					email, ok := claims["email"].(string)
 					if !ok {
 						http.NotFound(w, r)
@@ -201,8 +259,8 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				claims, err := validator.Validate(r.Header.Get("x-amzn-oidc-data"))
 				if err != nil {
-					log.Printf("[warn] ERROR CODE 003: %v", err)
-					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 003", http.StatusForbidden)
+					slog.ErrorCtx(r.Context(), "failed validate oidc token", slog.String("error_code", "005"), slog.String("detail", err.Error()))
+					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 005", http.StatusForbidden)
 					return
 				}
 				autholization(w, r, next, Email(claims.Email()))

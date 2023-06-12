@@ -2,10 +2,10 @@ package clipsight
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/mail"
 	"os"
@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/guregu/dynamo"
 	"github.com/pmezard/go-difflib/difflib"
+	"golang.org/x/exp/slog"
 )
 
 type Email string
@@ -35,11 +36,12 @@ func (email Email) String() string {
 
 type User struct {
 	schema
+	ID                string       `dynamodb:"ID" yaml:"id" json:"id"`
 	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
 	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
 	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
 	Region            string       `dynamodb:"Region" yaml:"region" json:"region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
+	Dashboards        []*Dashboard `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
 	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
 	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
 	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
@@ -52,7 +54,21 @@ type Dashboard struct {
 	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire" json:"expire,omitempty"`
 }
 
+var (
+	emailHashSolt     string
+	emailHashSoltOnce sync.Once
+)
+
 func (u *User) Restrict() error {
+	if u.ID == "" {
+		emailHashSoltOnce.Do(func() {
+			emailHashSolt = os.Getenv("CLIPSIGHT_EMAIL_HASH_SOLT")
+			if emailHashSolt == "" {
+				emailHashSolt = "clipsight"
+			}
+		})
+		u.ID = fmt.Sprintf("%x", sha256.Sum256([]byte(emailHashSolt+u.Email.String())))
+	}
 	if u.Email == "" {
 		return errors.New("email is required")
 	}
@@ -130,17 +146,29 @@ func (u *User) IsActive() bool {
 	return u.Enabled
 }
 
-func (u *User) Diff(user *User) (string, error) {
+func (u *User) Diff(user *User, maskEmail bool) (string, error) {
 	current, err := json.MarshalIndent(u, "", "  ")
 	if err != nil {
 		return "", err
 	}
+	currentStr := string(current)
 	other, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
 		return "", err
 	}
-	currentLines := difflib.SplitLines(string(current))
-	otherLines := difflib.SplitLines(string(other))
+	otherStr := string(other)
+	if maskEmail {
+		var email Email
+		if u != nil {
+			email = u.Email
+		} else {
+			email = user.Email
+		}
+		currentStr = strings.ReplaceAll(currentStr, email.String(), "********")
+		otherStr = strings.ReplaceAll(otherStr, email.String(), "********")
+	}
+	currentLines := difflib.SplitLines(currentStr)
+	otherLines := difflib.SplitLines(otherStr)
 	diff := difflib.UnifiedDiff{
 		A:       currentLines,
 		B:       otherLines,
@@ -267,7 +295,7 @@ func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {
 	}
 	user.UpdatedAt = flextime.Now()
 	putOp := app.ddbTable().Put(user)
-	log.Printf("[debug] update user item (email:%s rev:%d -> %d", user.Email, rev, user.Revision)
+	slog.DebugCtx(ctx, "update user item", slog.String("email", user.Email.String()), slog.Int64("current_rivision", rev), slog.Int64("next_revision", user.Revision))
 	if rev == 0 {
 		putOp = putOp.If("attribute_not_exists(HashKey) AND attribute_not_exists(SortKey)")
 	} else if rev > 0 {
@@ -288,14 +316,13 @@ func (app *ClipSight) GrantDashboardToUser(ctx context.Context, user *User, dash
 	if !exists {
 		return fmt.Errorf("dashboard `%s` not found in %s account", dashboardID, app.awsAccountID)
 	}
-	log.Printf("[info] dashboard name `%s`, arn is `%s`", *dashboard.Name, *dashboard.Arn)
-	log.Printf("[debug] try grant permission `%s`, user arn is `%s`", *dashboard.Name, user.QuickSightUserARN)
+	slog.InfoCtx(ctx, "grant dashboard permission", slog.String("user_id", user.ID), slog.String("dashboard_name", *dashboard.Name), slog.String("dashboard_arn", *dashboard.Arn), slog.String("quick_sight_user_arn", user.QuickSightUserARN))
 	if err := app.GrantDashboardParmission(ctx, dashboardID, user.QuickSightUserARN); err != nil {
 		return fmt.Errorf("grant dashboard permission: %w", err)
 	}
 
 	user.GrantDashboard(dashboard, expire)
-	log.Println("[debug] try save user", user.Email)
+	slog.DebugCtx(ctx, "try save user", slog.String("user_id", user.ID), slog.String("email", user.Email.String()))
 	if err := app.SaveUser(ctx, user); err != nil {
 		return fmt.Errorf("save user: %w", err)
 	}
@@ -304,12 +331,12 @@ func (app *ClipSight) GrantDashboardToUser(ctx context.Context, user *User, dash
 
 func (app *ClipSight) RevokeDashboardFromUser(ctx context.Context, user *User, dashboardID string) error {
 	if user.RevokeDashboard(dashboardID) {
-		log.Println("[debug] try save user", user.Email)
+		slog.DebugCtx(ctx, "try save user", slog.String("user_id", user.ID), slog.String("email", user.Email.String()))
 		if err := app.SaveUser(ctx, user); err != nil {
 			return fmt.Errorf("save user: %w", err)
 		}
 	}
-	log.Printf("[debug] try revoke permission `%s`, user arn is `%s`", dashboardID, user.QuickSightUserARN)
+	slog.DebugCtx(ctx, "try revoke dashboard permission", slog.String("user_id", user.ID), slog.String("dashboard_id", dashboardID), slog.String("quick_sight_user_arn", user.QuickSightUserARN))
 	if err := app.RevokeDashboardParmission(ctx, dashboardID, user.QuickSightUserARN); err != nil {
 		return fmt.Errorf("revoke dashboard permission: %w", err)
 	}
@@ -322,7 +349,7 @@ func (app *ClipSight) DescribeQuickSightUser(ctx context.Context, user *User) (*
 	if err != nil {
 		return nil, false, err
 	}
-	log.Printf("[debug] try DescribeQuicksightUser(%s, %s, %s)", app.awsAccountID, user.Namespace, userName)
+	slog.DebugCtx(ctx, "try DescribeQuicksightUser", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
 	output, err := app.qs.DescribeUser(ctx, &quicksight.DescribeUserInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		Namespace:    aws.String(user.Namespace),
@@ -349,7 +376,7 @@ func (app *ClipSight) RegisterQuickSightUser(ctx context.Context, user *User) (*
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[debug] try RegisterQuicksightUser(%s, %s, %s)", app.awsAccountID, user.Namespace, userName)
+	slog.DebugCtx(ctx, "try RegisterQuicksightUser", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
 	output, err := app.qs.RegisterUser(ctx, &quicksight.RegisterUserInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		Namespace:    aws.String(user.Namespace),
@@ -380,7 +407,7 @@ func (app *ClipSight) DeleteQuickSightUser(ctx context.Context, user *User) erro
 	if err != nil {
 		return err
 	}
-	log.Printf("[debug] try DeleteQuicksightUser(%s, %s, %s)", app.awsAccountID, user.Namespace, userName)
+	slog.DebugCtx(ctx, "try DeleteQuicksightUser", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
 	output, err := app.qs.DeleteUser(ctx, &quicksight.DeleteUserInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		Namespace:    aws.String(user.Namespace),
@@ -414,10 +441,10 @@ func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
 	wg.Add(1)
 	go func() {
 		defer func() {
-			log.Println("[debug] list users done")
+			slog.DebugCtx(ctx, "list users done")
 			wg.Done()
 		}()
-		log.Println("[debug] list users start")
+		slog.DebugCtx(ctx, "list users start")
 		iter := app.ddbTable().Scan().Iter()
 		for {
 			var user User
@@ -428,7 +455,7 @@ func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
 			ch <- &user
 		}
 		if err := iter.Err(); err != nil {
-			log.Printf("[error] list users: %s", err)
+			slog.ErrorCtx(ctx, "list users error", "detail", err)
 		}
 		close(ch)
 	}()

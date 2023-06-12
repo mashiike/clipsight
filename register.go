@@ -3,8 +3,9 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"golang.org/x/exp/slog"
 )
 
 // RegisterOption is Options for CLI Serve command
@@ -29,13 +30,13 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 	if err := app.prepareDynamoDB(ctx); err != nil {
 		return err
 	}
-	log.Println("[debug] try get user", email)
+	slog.DebugCtx(ctx, "try get user", slog.String("email", email.String()))
 	user, exists, err := app.GetUser(ctx, email)
 	if err != nil {
 		return fmt.Errorf("get user: %w", err)
 	}
 	if !exists {
-		log.Printf("[info] create new user for %s", email)
+		slog.InfoCtx(ctx, "user not found, create new user", slog.String("id", user.ID), slog.String("email", email.String()))
 		user = NewUser(email)
 	}
 	user.Namespace = opt.Namespace
@@ -48,7 +49,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 		user.TTL = time.Time{}
 	}
 
-	log.Println("[debug] try get quicksight user")
+	slog.DebugCtx(ctx, "try get quicksight user")
 	qsUser, exists, err := app.DescribeQuickSightUser(ctx, user)
 	if err != nil {
 		return fmt.Errorf("describe quicksight user: %w", err)
@@ -62,15 +63,14 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 		if err != nil {
 			return fmt.Errorf("register user: %w", err)
 		}
-		log.Printf("[notice] quicksight user `%s` in namespace `%s` not found, and register this user as reader", userName, user.Namespace)
+		slog.Log(ctx, LevelNotice, "register quicksight user", slog.String("id", user.ID), slog.String("namespace", user.Namespace), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
 	}
 	user.QuickSightUserARN = *qsUser.Arn
-	log.Printf("[info] related quicksight user `%s`", *qsUser.Arn)
-	log.Println("[debug] try save user", email)
+	slog.InfoCtx(ctx, "related quicksight user", slog.String("id", user.ID), slog.String("namespace", user.Namespace), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", *qsUser.UserName), slog.String("quick_sight_user_arn", *qsUser.Arn))
+	slog.DebugCtx(ctx, "try get save user", slog.String("id", user.ID), slog.String("email", user.Email.String()))
 	if err := app.SaveUser(ctx, user); err != nil {
 		return fmt.Errorf("save user: %w", err)
 	}
-	log.Println("[notice] register", user.Email, "revision:", user.Revision)
-	log.Println("[debug] user:", user)
+	slog.Log(ctx, LevelNotice, "register", slog.String("id", user.ID), slog.String("email", user.Email.String()), slog.Int64("revision", user.Revision))
 	return nil
 }

@@ -3,7 +3,7 @@
 +{
 +  "expire": "0001-01-01T00:00:00Z",
 +  "id": "ce8efebf37df747af2e3bef0821c0bfe0684a3688dce8e39cb6e9a7c4006b4b6",
-+  "email": "fuga@example.com",
++  "email": "********",
 +  "namespace": "default",
 +  "iam_role_arn": "arn:aws:iam::123456789012:role/external",
 +  "region": "ap-northeast-1",

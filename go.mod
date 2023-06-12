@@ -14,17 +14,19 @@ require (
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/fatih/color v1.15.0
 	github.com/fujiwara/go-amzn-oidc v0.0.6
-	github.com/fujiwara/logutils v1.1.2
 	github.com/fujiwara/ridge v0.6.1
+	github.com/google/uuid v1.3.0
 	github.com/guregu/dynamo v1.19.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mashiike/accesslogger v0.2.0
 	github.com/mashiike/google-oidc-middleware v0.1.0
+	github.com/mashiike/slogutils v0.2.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.2
 	go.mozilla.org/sops/v3 v3.7.3
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -68,7 +70,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.10.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect
@@ -110,7 +111,6 @@ require (
 	go.mozilla.org/gopgagent v0.0.0-20170926210634-4d7ea76ff71a // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
