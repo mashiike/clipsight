@@ -241,6 +241,8 @@ github.com/mashiike/google-oidc-middleware v0.1.0 h1:WlRSbeR6Acd8zlCvHus/AykKitc
 github.com/mashiike/google-oidc-middleware v0.1.0/go.mod h1:wHqfsYDKO/PyFch6Kr4Tx29df8lN2TUZ99v7oiZ5C2E=
 github.com/mashiike/slogutils v0.2.0 h1:bJmNylmNgr6bCC3xRbRhXeDp8LPWU9yzSU9Fq/fU7UA=
 github.com/mashiike/slogutils v0.2.0/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
+github.com/mashiike/slogutils v0.2.1 h1:qJ9eSuINlYwxj6mF2G71THqVBNEP0FiXsLZ4n0/+myc=
+github.com/mashiike/slogutils v0.2.1/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-colorable v0.1.4/go.mod h1:U0ppj6V5qS13XJ6of8GYAs25YV2eR4EVcfRqFIhoBtE=
 github.com/mattn/go-colorable v0.1.7/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=

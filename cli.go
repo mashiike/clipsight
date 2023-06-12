@@ -68,6 +68,18 @@ func RunCLI(ctx context.Context, args []string) error {
 			slog.LevelWarn:  slogutils.Color(color.FgYellow),
 			slog.LevelError: slogutils.Color(color.FgRed, color.Bold),
 		},
+		RecordTransformerFuncs: []slogutils.RecordTransformerFunc{
+			slogutils.ConvertLegacyLevel(
+				map[string]slog.Level{
+					"debug":  slog.LevelDebug,
+					"info":   slog.LevelInfo,
+					"notice": LevelNotice,
+					"warn":   slog.LevelWarn,
+					"error":  slog.LevelError,
+				},
+				true,
+			),
+		},
 		Writer: os.Stderr,
 		HandlerOptions: &slog.HandlerOptions{
 			Level: minLevel,
@@ -94,15 +106,15 @@ func RunCLI(ctx context.Context, args []string) error {
 					level := a.Value.Any().(slog.Level)
 					switch {
 					case level < LevelInfo:
-						a.Value = slog.StringValue("debug")
+						a.Value = slog.StringValue("DEBUG")
 					case level < LevelNotice:
-						a.Value = slog.StringValue("info")
+						a.Value = slog.StringValue("INFO")
 					case level < LevelWarn:
-						a.Value = slog.StringValue("notice")
+						a.Value = slog.StringValue("NOTICE")
 					case level < LevelError:
-						a.Value = slog.StringValue("warn")
+						a.Value = slog.StringValue("WARN")
 					default:
-						a.Value = slog.StringValue("error")
+						a.Value = slog.StringValue("ERROR")
 					}
 				}
 				return a

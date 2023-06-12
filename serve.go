@@ -19,9 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	validator "github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/fujiwara/ridge"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mashiike/accesslogger"
 	googleoidcmiddleware "github.com/mashiike/google-oidc-middleware"
+	"github.com/mashiike/slogutils"
 	"golang.org/x/exp/slog"
 )
 
@@ -85,6 +87,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			})
 			return
 		}
+		slog.InfoCtx(ctx, "accume role", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("iam_role", user.IAMRoleARN))
 		qs, err := app.NewQuickSightClientWithUser(ctx, user)
 		if err != nil {
 			slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
@@ -117,6 +120,13 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				},
 				SessionLifetimeInMinutes: aws.Int64(60),
 			})
+			slog.InfoCtx(ctx, "generate embed url",
+				slog.String("user_id", user.ID),
+				slog.String("email", user.Email.String()),
+				slog.String("quick_sight_user_arn", user.QuickSightUserARN),
+				slog.String("dashboard_id", dashbord.DashboardID),
+				slog.String("dashboard_name", dashbord.Name),
+			)
 			if err != nil {
 				slog.ErrorCtx(r.Context(), "failed generate embed url",
 					slog.String("user_id", user.ID),
@@ -142,8 +152,46 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		})
 	})
 
-	accessLoggingMiddleware := accesslogger.New(accesslogger.CombinedDLogger(os.Stderr))
-
+	accessLoggingMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l := accesslogger.NewAccessLog(r)
+			reqId := r.Header.Get("X-Request-Id")
+			if reqId == "" {
+				reqId = uuid.New().String()
+			}
+			ctx := slogutils.With(r.Context(), slog.String("request_id", reqId))
+			responseWriter := &accesslogger.ResponseWriter{
+				ResponseWriter: w,
+			}
+			r = r.WithContext(ctx)
+			defer func() {
+				err := recover()
+				l = l.WriteResponseInfo(responseWriter)
+				slog.Log(r.Context(), LevelNotice, l.Request,
+					slog.String("request_id", reqId),
+					slog.String("remote_addr", l.RemoteAddr),
+					slog.String("accessed_at", l.AccessedAt.Format("02/Jan/2006:15:04:05 -0700")),
+					slog.Int("status_code", l.StatusCode),
+					slog.Int("body_byte_sent", l.BodyByteSent),
+					slog.String("referer", l.Referer),
+					slog.String("user_agent", l.UserAgent),
+					slog.Int64("response_time_microseconds", l.ResponseTime),
+					slog.Int64("first_sent_time_microseconds", l.FirstSentTime),
+					slog.String("host", r.Host),
+					slog.String("method", r.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("proto", r.Proto),
+					slog.String("x_amzn_trace_id", r.Header.Get("X-Amzn-Trace-Id")),
+					slog.String("x_amz_cf_id", r.Header.Get("X-Amz-Cf-Id")),
+					slog.String("cloudfront_viewer_country", r.Header.Get("CloudFront-Viewer-Country")),
+				)
+				if err != nil {
+					panic(err)
+				}
+			}()
+			next.ServeHTTP(responseWriter, r)
+		})
+	}
 	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
 		accessLoggingMiddleware(
 			authMiddleware(

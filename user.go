@@ -36,12 +36,12 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	ID                string       `dynamodb:"ID,hash" yaml:"id" json:"id"`
+	ID                string       `dynamodb:"ID" yaml:"id" json:"id"`
 	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
 	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
 	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
 	Region            string       `dynamodb:"Region" yaml:"region" json:"region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
+	Dashboards        []*Dashboard `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
 	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
 	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
 	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
