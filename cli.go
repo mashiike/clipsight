@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/fatih/color"
 	"github.com/mashiike/slogutils"
 	"golang.org/x/exp/slog"
@@ -73,6 +74,21 @@ func RunCLI(ctx context.Context, args []string) error {
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if strings.Contains(a.Key, "email") && cli.MaskEmail {
 					return slog.String("email", "********")
+				}
+				if a.Key == "quick_sight_user_arn" && cli.MaskEmail {
+					arn, err := arn.Parse(a.Value.String())
+					if err != nil {
+						return slog.String("quick_sight_user_arn", "********")
+					}
+					parts := strings.Split(arn.Resource, "/")
+					parts[len(parts)-1] = "********"
+					arn.Resource = strings.Join(parts, "/")
+					return slog.String("quick_sight_user_arn", arn.String())
+				}
+				if a.Key == "quick_sight_user_name" && cli.MaskEmail {
+					parts := strings.Split(a.Value.String(), "/")
+					parts[len(parts)-1] = "********"
+					return slog.String("quick_sight_user_arn", strings.Join(parts, "/"))
 				}
 				if a.Key == slog.LevelKey {
 					level := a.Value.Any().(slog.Level)
