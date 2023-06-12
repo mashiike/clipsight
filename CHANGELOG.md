@@ -1,4 +1,7 @@
 # Changelog
+## [v0.2.3](https://github.com/mashiike/clipsight/compare/v0.2.2...v0.2.3) - 2023-06-12
+- fix userName is no mask by @mashiike in https://github.com/mashiike/clipsight/pull/82
+
 ## [v0.2.1](https://github.com/mashiike/clipsight/compare/v0.2.0...v0.2.1) - 2023-06-12
 - fix .yml can load by @mashiike in https://github.com/mashiike/clipsight/pull/75
 
