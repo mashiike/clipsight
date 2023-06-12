@@ -117,7 +117,8 @@ func LoadConfig(p string) (*Config, error) {
 			slog.Debug("skip directory", slog.String("entity_name", entity.Name()))
 			continue
 		}
-		if filepath.Ext(entity.Name()) != ".yaml" {
+		ext := filepath.Ext(entity.Name())
+		if ext != ".yaml" && ext != ".yml" {
 			slog.Debug("skip non-yaml file", slog.String("entity_name", entity.Name()))
 			continue
 		}
