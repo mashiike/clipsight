@@ -2,7 +2,7 @@ name: action test
 on:
   push:
     branches:
-      - main
+      - v0
   workflow_dispatch:
 
 jobs:
