@@ -3,8 +3,9 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"golang.org/x/exp/slog"
 )
 
 type GrantOption struct {
@@ -21,8 +22,7 @@ func (app *ClipSight) RunGrant(ctx context.Context, opt *GrantOption) error {
 	if err := app.prepareDynamoDB(ctx); err != nil {
 		return err
 	}
-
-	log.Println("[debug] try get user", email)
+	slog.DebugCtx(ctx, "try get user", slog.String("email", email.String()))
 	user, exists, err := app.GetUser(ctx, email)
 	if err != nil {
 		return fmt.Errorf("get user: %w", err)
@@ -38,7 +38,6 @@ func (app *ClipSight) RunGrant(ctx context.Context, opt *GrantOption) error {
 		return err
 	}
 
-	log.Println("[notice] grant dashboard", opt.DashboardID, "to", user.Email, "revision:", user.Revision)
-	log.Println("[debug] user:", user)
+	slog.Log(ctx, LevelNotice, "grant dashboard", slog.String("dashboard_id", opt.DashboardID), slog.String("email", user.Email.String()), slog.Int64("revision", user.Revision))
 	return nil
 }

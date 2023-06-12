@@ -3,7 +3,6 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/c-bata/go-prompt"
@@ -43,15 +42,17 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 	fmt.Print("Applying...", len(changes), " changes\n")
 	for _, c := range changes {
 		var email Email
+		var id string
 		if c.Before != nil {
+			id = c.Before.ID
 			email = c.Before.Email
 		} else {
+			id = c.After.ID
 			email = c.After.Email
 		}
-		slog.DebugCtx(ctx, "change target dump", slog.String("email", email.String()))
-		log.Printf("[debug] user: %s", email)
+		slog.DebugCtx(ctx, "change target dump", slog.String("id", id), slog.String("email", email.String()))
 		if c.NeedRegister() {
-			log.Printf("[debug] need register: %s", c.After.Email)
+			slog.DebugCtx(ctx, "need register", slog.String("id", id), slog.String("email", c.After.Email.String()))
 			if err := app.RunRegister(ctx, &RegisterOption{
 				Email:                  c.After.Email.String(),
 				Namespace:              c.After.Namespace,
@@ -64,10 +65,10 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 			}
 		}
 		if c.NeedPermissionModify() {
-			log.Println("[debug] need permission modify")
+			slog.DebugCtx(ctx, "need permission modify", slog.String("id", id), slog.String("email", c.After.Email.String()))
 			grant, revoke := c.Before.DiffPermissions(c.After)
 			for _, g := range grant {
-				log.Printf("[debug] grant permission: %s to %s", g.DashboardID, c.After.Email)
+				slog.DebugCtx(ctx, "grant permission", slog.String("id", id), slog.String("email", c.After.Email.String()), slog.String("dashboard_id", g.DashboardID))
 				if err := app.RunGrant(ctx, &GrantOption{
 					Email:       c.After.Email.String(),
 					DashboardID: g.DashboardID,
@@ -77,7 +78,7 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 				}
 			}
 			for _, r := range revoke {
-				log.Printf("[debug] revoke permission: %s from %s", r.DashboardID, c.Before.Email)
+				slog.DebugCtx(ctx, "revoke permission", slog.String("id", id), slog.String("email", c.Before.Email.String()), slog.String("dashboard_id", r.DashboardID))
 				if err := app.RunRevoke(ctx, &RevokeOption{
 					Email:       c.Before.Email.String(),
 					DashboardID: r.DashboardID,
@@ -87,7 +88,7 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 			}
 		}
 		if c.NeedDeregister() {
-			log.Println("[debug] need deregister")
+			slog.DebugCtx(ctx, "need deregister", slog.String("id", id), slog.String("email", c.Before.Email.String()))
 			if err := app.RunDeregister(ctx, &DeregisterOption{
 				Email: c.Before.Email.String(),
 			}); err != nil {

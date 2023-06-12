@@ -3,9 +3,9 @@ package clipsight
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/Songmu/flextime"
+	"golang.org/x/exp/slog"
 )
 
 type DeregisterOption struct {
@@ -23,8 +23,7 @@ func (app *ClipSight) RunDeregister(ctx context.Context, opt *DeregisterOption) 
 	if err := app.prepareDynamoDB(ctx); err != nil {
 		return err
 	}
-
-	log.Println("[debug] try get user", email)
+	slog.DebugCtx(ctx, "try get user", slog.String("email", email.String()))
 	user, exists, err := app.GetUser(ctx, email)
 	if err != nil {
 		return fmt.Errorf("get user: %w", err)
@@ -34,16 +33,16 @@ func (app *ClipSight) RunDeregister(ctx context.Context, opt *DeregisterOption) 
 	}
 	user.Enabled = false
 	if !opt.DisableOnly {
-		log.Println("[debug] try set disable user")
+		slog.DebugCtx(ctx, "try deregister user", slog.String("email", email.String()))
 		if err := app.SaveUser(ctx, user); err != nil {
 			return fmt.Errorf("update user: %w", err)
 		}
-		log.Println("[notice] disable user", user.Email, "revision:", user.Revision)
+		slog.Log(ctx, LevelNotice, "disable user", slog.String("id", user.ID), slog.String("email", email.String()), slog.Int64("revision", user.Revision))
 		return nil
 	}
 
 	if !opt.KeepQuickSightUser {
-		log.Println("[debug] try get quicksight user")
+		slog.DebugCtx(ctx, "try get quicksight user", slog.String("email", email.String()))
 		if exists {
 			if err := app.DeleteQuickSightUser(ctx, user); err != nil {
 				return fmt.Errorf("deregister user: %w", err)
@@ -52,23 +51,21 @@ func (app *ClipSight) RunDeregister(ctx context.Context, opt *DeregisterOption) 
 			if err != nil {
 				return fmt.Errorf("get quicksight user name: %w", err)
 			}
-
-			log.Printf("[notice] quicksight user `%s` in namespace `%s` found, and deregister this user as reader", userName, user.Namespace)
+			slog.Log(ctx, LevelNotice, "QuickSight user found, and deregister this user", slog.String("id", user.ID), slog.String("email", email.String()), slog.String("quick_sight_user_name", userName))
 		}
 	}
 	user.TTL = flextime.Now()
 	if opt.SetTTLOnly {
-		log.Println("[debug] try set ttl user")
+		slog.DebugCtx(ctx, "try set ttl user", slog.String("email", email.String()))
 		if err := app.SaveUser(ctx, user); err != nil {
 			return fmt.Errorf("save user: %w", err)
 		}
 	} else {
-		log.Println("[debug] try delete user")
+		slog.DebugCtx(ctx, "try delete user", slog.String("email", email.String()))
 		if err := app.DeleteUser(ctx, user); err != nil {
 			return fmt.Errorf("delete user: %w", err)
 		}
 	}
-	log.Println("[notice] deregister", user.Email, "revision:", user.Revision, "TTL:", user.TTL)
-	log.Println("[debug] user:", user)
+	slog.Log(ctx, LevelNotice, "deregister user", slog.String("id", user.ID), slog.String("email", email.String()), slog.Int64("revision", user.Revision), slog.Time("ttl", user.TTL))
 	return nil
 }

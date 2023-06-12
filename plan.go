@@ -36,7 +36,11 @@ func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeIn
 		if change.After == nil {
 			deleted++
 		}
-		fmt.Println(change)
+		if app.maskEmail {
+			fmt.Println(change.String())
+		} else {
+			fmt.Println(change.UnmaskString())
+		}
 	}
 	fmt.Printf("\tcreated: %d, changes: %d, deleted: %d\n\n", created, len(changes)-created-deleted, deleted)
 	return changes, nil

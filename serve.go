@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/mashiike/accesslogger"
 	googleoidcmiddleware "github.com/mashiike/google-oidc-middleware"
+	"golang.org/x/exp/slog"
 )
 
 // ServeOption is Options for CLI Serve command
@@ -66,7 +66,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		if err := tpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
 			"BaseURL": opt.BaseURL,
 		}); err != nil {
-			log.Println("[error] failed execute template ERROR CODE 001:", err)
+			slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
 			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
 		}
 		w.Header().Set("Content-Type", "text/html")
@@ -87,9 +87,14 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 		}
 		qs, err := app.NewQuickSightClientWithUser(ctx, user)
 		if err != nil {
-			log.Printf("[error] can not initialize QuickSightclient: %v", err)
+			slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
+				slog.String("user_id", user.ID),
+				slog.String("error_code", "002"),
+				slog.String("detail", err.Error()),
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "002",
 				"error": "can not initialize",
 			})
 			return
@@ -113,9 +118,14 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				SessionLifetimeInMinutes: aws.Int64(60),
 			})
 			if err != nil {
-				log.Println("[error]", err)
+				slog.ErrorCtx(r.Context(), "failed generate embed url",
+					slog.String("user_id", user.ID),
+					slog.String("error_code", "003"),
+					slog.String("detail", err.Error()),
+				)
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]interface{}{
+					"code":  "003",
 					"error": "can not get embeded url",
 				})
 				return
@@ -148,8 +158,8 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 	autholization := func(w http.ResponseWriter, r *http.Request, next http.Handler, email Email) {
 		user, ok, err := app.GetUser(ctx, email)
 		if err != nil {
-			log.Printf("[error] ERROR CODE 002: %v", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 002", http.StatusInternalServerError)
+			slog.ErrorCtx(r.Context(), "failed get user", slog.String("error_code", "004"), slog.String("detail", err.Error()))
+			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 004", http.StatusInternalServerError)
 			return
 		}
 		if !ok {
@@ -179,13 +189,13 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return authenticationMiddleware(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					//auth check
-					log.Println("[debug] get claim")
+					slog.DebugCtx(r.Context(), "get claim")
 					claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
 					if !ok {
 						http.NotFound(w, r)
 						return
 					}
-					log.Println("[debug] check email")
+					slog.DebugCtx(r.Context(), "check email")
 					email, ok := claims["email"].(string)
 					if !ok {
 						http.NotFound(w, r)
@@ -201,8 +211,8 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				claims, err := validator.Validate(r.Header.Get("x-amzn-oidc-data"))
 				if err != nil {
-					log.Printf("[warn] ERROR CODE 003: %v", err)
-					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 003", http.StatusForbidden)
+					slog.ErrorCtx(r.Context(), "failed validate oidc token", slog.String("error_code", "005"), slog.String("detail", err.Error()))
+					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 005", http.StatusForbidden)
 					return
 				}
 				autholization(w, r, next, Email(claims.Email()))

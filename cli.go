@@ -113,7 +113,7 @@ func RunCLI(ctx context.Context, args []string) error {
 		slog.String("app", "clipsight"),
 		slog.String("version", Version),
 	))
-	app, err := New(ctx, cli.DDBTable)
+	app, err := New(ctx, cli.DDBTable, cli.MaskEmail)
 	if err != nil {
 		return err
 	}
