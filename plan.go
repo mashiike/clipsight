@@ -52,7 +52,7 @@ func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeIn
 			if !app.maskEmail {
 				email = change.After.Email.String()
 			}
-			createdUsers = append(createdUsers, fmt.Sprintf("%s(%s)", change.After.ID, email))
+			createdUsers = append(createdUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.After.ID, email, change.After.Namespace))
 			continue
 		}
 		if change.After == nil {
@@ -61,10 +61,14 @@ func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeIn
 			if !app.maskEmail {
 				email = change.Before.Email.String()
 			}
-			deletedUsers = append(deletedUsers, fmt.Sprintf("%s(%s)", change.Before.ID, email))
+			deletedUsers = append(deletedUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.Before.ID, email, change.Before.Namespace))
 			continue
 		}
-		changeUsers = append(changeUsers, fmt.Sprintf("%s(%s)", change.After.ID, change.After.Email.String()))
+		email := "********"
+		if !app.maskEmail {
+			email = change.After.Email.String()
+		}
+		changeUsers = append(changeUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.After.ID, email, change.After.Namespace))
 
 	}
 	resourceChangeSummary := fmt.Sprintf("Plan: %d to create, %d to changes, %d to delete.\n\n", created, len(changes)-created-deleted, deleted)
@@ -72,7 +76,29 @@ func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeIn
 	case "markdown":
 		fmt.Println("## ClipSight Permission Changes")
 		fmt.Println("")
-		fmt.Printf("<pre><code>%s</code></pre>\n", resourceChangeSummary)
+		fmt.Printf("<pre><code>%s</code></pre>\n\n", resourceChangeSummary)
+		if len(createdUsers) > 0 {
+			fmt.Println("* Create")
+			for _, user := range createdUsers {
+				fmt.Printf("  * %s\n", user)
+			}
+			fmt.Println("")
+		}
+		if len(changeUsers) > 0 {
+			fmt.Println("* Change")
+			for _, user := range changeUsers {
+				fmt.Printf("  * %s\n", user)
+			}
+			fmt.Println("")
+		}
+		if len(deletedUsers) > 0 {
+			fmt.Println("* Delete")
+			for _, user := range deletedUsers {
+				fmt.Printf("  * %s\n", user)
+			}
+			fmt.Println("")
+		}
+		fmt.Println("")
 		fmt.Printf("<details><summary>Details (Click me)</summary>\n\n```\n\n%s```\n\t%s\n</details>\n", details.String(), resourceChangeSummary)
 	default:
 		fmt.Println(details.String())
