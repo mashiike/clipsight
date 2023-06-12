@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.0](https://github.com/mashiike/clipsight/compare/v0.1.3...v0.2.0) - 2023-06-12
+- Bump golang.org/x/net from 0.5.0 to 0.7.0 by @dependabot in https://github.com/mashiike/clipsight/pull/41
+- Bump github.com/aws/aws-sdk-go from 1.44.180 to 1.44.249 by @dependabot in https://github.com/mashiike/clipsight/pull/62
+- Bump actions/setup-go from 3 to 4 by @dependabot in https://github.com/mashiike/clipsight/pull/46
+- plan and apply command for permission management as as code by @mashiike in https://github.com/mashiike/clipsight/pull/69
+- slog and masking email by @mashiike in https://github.com/mashiike/clipsight/pull/70
+- fix delete plan by @mashiike in https://github.com/mashiike/clipsight/pull/71
+- plan format markdown and add actions. for CI Plan by @mashiike in https://github.com/mashiike/clipsight/pull/72
+- if version command no sts by @mashiike in https://github.com/mashiike/clipsight/pull/73
+
 ## [v0.1.3](https://github.com/mashiike/clipsight/compare/v0.1.2...v0.1.3) - 2023-01-25
 - no use inner HTML by @mashiike in https://github.com/mashiike/clipsight/pull/19
 - Bump github.com/aws/aws-sdk-go-v2/service/sts from 1.18.0 to 1.18.1 by @dependabot in https://github.com/mashiike/clipsight/pull/18
