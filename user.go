@@ -2,20 +2,25 @@ package clipsight
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/mail"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/guregu/dynamo"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 type Email string
@@ -30,21 +35,49 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	Email             Email        `dynamodb:"Email"`
-	Namespace         string       `dynamodb:"Namespace"`
-	IAMRoleARN        string       `dynamodb:"IAMRoleARN"`
-	Region            string       `dynamodb:"Region"`
-	Dashboards        []*Dashboard `dynammodb:"Dashboards"`
-	Enabled           bool         `dynamodb:"Enabled"`
-	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime"`
-	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime"`
-	QuickSightUserARN string       `dynamodb:"QuickSightUserARN"`
+	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
+	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
+	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
+	Region            string       `dynamodb:"Region" yaml:"region" json:"region"`
+	Dashboards        []*Dashboard `dynammodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
+	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
+	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
+	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
+	QuickSightUserARN string       `dynamodb:"QuickSightUserARN" yaml:"-" json:"-"`
 }
 
 type Dashboard struct {
-	Name        string
-	DashboardID string    `dynamodb:"DashboardID"`
-	Expire      time.Time `dynamodb:"Expire,unixtime"`
+	Name        string    `yaml:"name,omitempty" json:"name,omitempty"`
+	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id" json:"dashboard_id"`
+	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire" json:"expire,omitempty"`
+}
+
+func (u *User) Restrict() error {
+	if u.Email == "" {
+		return errors.New("email is required")
+	}
+	if err := u.Email.Validate(); err != nil {
+		return fmt.Errorf("email is invalid: %w", err)
+	}
+	if u.Namespace == "" {
+		u.Namespace = "default"
+	}
+	if u.IAMRoleARN == "" {
+		return errors.New("iam_role_arn is required")
+	}
+	if u.Region == "" {
+		u.Region = os.Getenv("AWS_REGION")
+		if u.Region == "" {
+			return errors.New("region is required")
+		}
+	}
+	u.FillKey()
+	for i, d := range u.Dashboards {
+		if d.DashboardID == "" {
+			return fmt.Errorf("dashboards[%d].dashboard_id is required", i)
+		}
+	}
+	return nil
 }
 
 func (u *User) FillKey() *User {
@@ -97,6 +130,110 @@ func (u *User) IsActive() bool {
 	return u.Enabled
 }
 
+func (u *User) Diff(user *User) (string, error) {
+	current, err := json.MarshalIndent(u, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	other, err := json.MarshalIndent(user, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	currentLines := difflib.SplitLines(string(current))
+	otherLines := difflib.SplitLines(string(other))
+	diff := difflib.UnifiedDiff{
+		A:       currentLines,
+		B:       otherLines,
+		Context: len(currentLines) + len(otherLines),
+	}
+
+	text, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return "", err
+	}
+	return text, nil
+}
+
+func (u *User) GetDashboard(id string) (*Dashboard, bool) {
+	if u == nil {
+		return nil, false
+	}
+	for _, d := range u.Dashboards {
+		if d.DashboardID == id {
+			if !d.IsVisible() {
+				return nil, false
+			}
+			return d, true
+		}
+	}
+	return nil, false
+}
+
+func (u *User) DiffPermissions(other *User) ([]*Dashboard, []*Dashboard) {
+	var grant, revoke []*Dashboard
+	if other != nil {
+		for _, d := range other.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			d2, ok := u.GetDashboard(d.DashboardID)
+			if !ok {
+				grant = append(grant, d)
+				continue
+			}
+			if d2.Expire != d.Expire {
+				grant = append(grant, d)
+				continue
+			}
+		}
+	}
+	if u != nil {
+		for _, d := range u.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			if _, ok := other.GetDashboard(d.DashboardID); !ok {
+				revoke = append(revoke, d)
+			}
+		}
+	}
+	return grant, revoke
+}
+
+func (u *User) Equals(user *User) bool {
+	if u == nil || user == nil {
+		return u == nil && user == nil
+	}
+	if u.Email != user.Email {
+		return false
+	}
+	if u.Namespace != user.Namespace {
+		return false
+	}
+	if u.IAMRoleARN != user.IAMRoleARN {
+		return false
+	}
+	if u.Region != user.Region {
+		return false
+	}
+	return u.Enabled == user.Enabled
+}
+
+func (u *User) EqualDashboardPermissions(user *User) bool {
+	if u == nil || user == nil {
+		return u == nil && user == nil
+	}
+	if len(u.Dashboards) != len(user.Dashboards) {
+		return false
+	}
+	// check dashboard element match by DashboardID
+	grant, revoke := u.DiffPermissions(user)
+	if len(grant) > 0 || len(revoke) > 0 {
+		return false
+	}
+	return true
+}
+
 func NewUser(email Email) *User {
 	return (&User{
 		Email: email,
@@ -107,7 +244,7 @@ func (d *Dashboard) IsVisible() bool {
 	if d.Expire.IsZero() {
 		return true
 	}
-	return time.Now().UnixNano() < d.Expire.UnixNano()
+	return flextime.Now().UnixNano() < d.Expire.UnixNano()
 }
 
 func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, error) {
@@ -126,9 +263,9 @@ func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {
 	rev := user.Revision
 	user.Revision++
 	if user.CreatedAt.IsZero() {
-		user.CreatedAt = time.Now()
+		user.CreatedAt = flextime.Now()
 	}
-	user.UpdatedAt = time.Now()
+	user.UpdatedAt = flextime.Now()
 	putOp := app.ddbTable().Put(user)
 	log.Printf("[debug] update user item (email:%s rev:%d -> %d", user.Email, rev, user.Revision)
 	if rev == 0 {
@@ -137,6 +274,10 @@ func (app *ClipSight) SaveUser(ctx context.Context, user *User) error {
 		putOp = putOp.If("Revision = ?", rev)
 	}
 	return putOp.RunWithContext(ctx)
+}
+
+func (app *ClipSight) DeleteUser(ctx context.Context, user *User) error {
+	return app.ddbTable().Delete("HashKey", user.HashKey).Range("SortKey", user.SortKey).RunWithContext(ctx)
 }
 
 func (app *ClipSight) GrantDashboardToUser(ctx context.Context, user *User, dashboardID string, expire time.Time) error {
@@ -227,6 +368,33 @@ func (app *ClipSight) RegisterQuickSightUser(ctx context.Context, user *User) (*
 	return output.User, nil
 }
 
+func (app *ClipSight) DeleteQuickSightUser(ctx context.Context, user *User) error {
+	_, exists, err := app.DescribeQuickSightUser(ctx, user)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	userName, err := user.QuickSightUserName()
+	if err != nil {
+		return err
+	}
+	log.Printf("[debug] try DeleteQuicksightUser(%s, %s, %s)", app.awsAccountID, user.Namespace, userName)
+	output, err := app.qs.DeleteUser(ctx, &quicksight.DeleteUserInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(user.Namespace),
+		UserName:     aws.String(userName),
+	})
+	if err != nil {
+		return err
+	}
+	if output.Status != http.StatusOK {
+		return fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return nil
+}
+
 func (app *ClipSight) NewQuickSightClientWithUser(ctx context.Context, user *User) (*quicksight.Client, error) {
 	awsCfgV2, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -238,6 +406,33 @@ func (app *ClipSight) NewQuickSightClientWithUser(ctx context.Context, user *Use
 	})
 	awsCfgV2.Credentials = creds
 	return quicksight.NewFromConfig(awsCfgV2), nil
+}
+
+func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
+	ch := make(chan *User, 100)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			log.Println("[debug] list users done")
+			wg.Done()
+		}()
+		log.Println("[debug] list users start")
+		iter := app.ddbTable().Scan().Iter()
+		for {
+			var user User
+			isContinue := iter.NextWithContext(ctx, &user)
+			if !isContinue {
+				break
+			}
+			ch <- &user
+		}
+		if err := iter.Err(); err != nil {
+			log.Printf("[error] list users: %s", err)
+		}
+		close(ch)
+	}()
+	return ch, wg.Wait
 }
 
 type contextKey string

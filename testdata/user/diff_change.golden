@@ -1,0 +1,23 @@
+@@ -1,16 +1,20 @@
+ {
+   "hash_key": "",
+   "sort_key": "",
+   "expire": "0001-01-01T00:00:00Z",
+-  "email": "hoge@example.com",
+-  "namespace": "external",
++  "email": "fuga@example.com",
++  "namespace": "default",
+   "iam_role_arn": "arn:aws:iam::123456789012:role/external",
+   "region": "ap-northeast-1",
+   "dashboards": [
+     {
+       "dashboard_id": "12345678-1234-1234-1234-123456789012",
+       "expire": "2021-01-01T00:00:00Z"
++    },
++    {
++      "dashboard_id": "00000000-0000-0000-0000-000000000000",
++      "expire": "0001-01-01T00:00:00Z"
+     }
+   ],
+   "enabled": true
+ }

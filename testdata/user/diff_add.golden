@@ -1,0 +1,18 @@
+@@ -1,16 +1 @@
+-{
+-  "hash_key": "",
+-  "sort_key": "",
+-  "expire": "0001-01-01T00:00:00Z",
+-  "email": "hoge@example.com",
+-  "namespace": "external",
+-  "iam_role_arn": "arn:aws:iam::123456789012:role/external",
+-  "region": "ap-northeast-1",
+-  "dashboards": [
+-    {
+-      "dashboard_id": "12345678-1234-1234-1234-123456789012",
+-      "expire": "2021-01-01T00:00:00Z"
+-    }
+-  ],
+-  "enabled": true
+-}
++null
