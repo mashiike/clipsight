@@ -54,8 +54,8 @@ github.com/aws/aws-lambda-go v1.26.0/go.mod h1:jJmlefzPfGnckuHdXX7/80O3BvUUi12XO
 github.com/aws/aws-lambda-go v1.41.0 h1:l/5fyVb6Ud9uYd411xdHZzSf2n86TakxzpvIoz7l+3Y=
 github.com/aws/aws-lambda-go v1.41.0/go.mod h1:jwFe2KmMsHmffA1X2R09hH6lFzJQxzI8qK17ewzbQMM=
 github.com/aws/aws-sdk-go v1.44.223/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
-github.com/aws/aws-sdk-go v1.44.279 h1:g23dxnYjIiPlQo0gIKNR0zVPsSvo1bj5frWln+5sfhk=
-github.com/aws/aws-sdk-go v1.44.279/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go v1.44.280 h1:UYl/yxhDxP8naok6ftWyQ9/9ZzNwjC9dvEs/j8BkGhw=
+github.com/aws/aws-sdk-go v1.44.280/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
 github.com/aws/aws-sdk-go-v2 v1.18.0 h1:882kkTpSFhdgYRKVZ/VCgf7sd0ru57p2JCxz4/oN5RY=
 github.com/aws/aws-sdk-go-v2 v1.18.0/go.mod h1:uzbQtefpm44goOPmdKyAlXSNcwlRgF3ePWVW6EtJvvw=
 github.com/aws/aws-sdk-go-v2/config v1.18.25 h1:JuYyZcnMPBiFqn87L2cRppo+rNwgah6YwD3VuyvaW6Q=
@@ -239,8 +239,6 @@ github.com/mashiike/accesslogger v0.2.0 h1:NRDs4hxJDTwl/pOzf2Q5xkG7NfZMaTZk+xLQ4
 github.com/mashiike/accesslogger v0.2.0/go.mod h1:ABz+ZD/gjU2LGLeACmjMuprYVo1DgKUd6WbYhI0oags=
 github.com/mashiike/google-oidc-middleware v0.1.0 h1:WlRSbeR6Acd8zlCvHus/AykKitchIOCEThtNzrZ0nb0=
 github.com/mashiike/google-oidc-middleware v0.1.0/go.mod h1:wHqfsYDKO/PyFch6Kr4Tx29df8lN2TUZ99v7oiZ5C2E=
-github.com/mashiike/slogutils v0.2.0 h1:bJmNylmNgr6bCC3xRbRhXeDp8LPWU9yzSU9Fq/fU7UA=
-github.com/mashiike/slogutils v0.2.0/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
 github.com/mashiike/slogutils v0.2.1 h1:qJ9eSuINlYwxj6mF2G71THqVBNEP0FiXsLZ4n0/+myc=
 github.com/mashiike/slogutils v0.2.1/go.mod h1:ru0zBAT5VY9VhUIQxQoMHQEsKkPHW804+lIUz+y3gQo=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
