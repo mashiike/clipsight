@@ -225,12 +225,17 @@ func (c *ChangeInfo) diffString(mask bool) string {
 	var builder strings.Builder
 	builder.WriteString("QuickSightUser: ")
 	var userName string
+	var email string
 	if c.Before != nil {
 		userName, _ = c.Before.QuickSightUserName()
+		email, _ = c.Before.Email.String()
 	}
 	if userName == "" && c.After != nil {
 		userName, _ = c.After.QuickSightUserName()
+		email, _ = c.After.Email.String()
 	}
+	if mask {
+		userName = strings.ReplaceAll(userName, email, "******")
 	builder.WriteString(userName)
 	builder.WriteString("\n")
 	diffStr, err := c.Before.Diff(c.After, mask)
