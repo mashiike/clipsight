@@ -1,4 +1,8 @@
 # Changelog
+## [v0.2.5](https://github.com/mashiike/clipsight/compare/v0.2.4...v0.2.5) - 2023-06-13
+- id set, on register by @mashiike in https://github.com/mashiike/clipsight/pull/88
+- check Dashboard exists on serve embeded by @mashiike in https://github.com/mashiike/clipsight/pull/90
+
 ## [v0.2.4](https://github.com/mashiike/clipsight/compare/v0.2.3...v0.2.4) - 2023-06-13
 - deregister --disable-only flag is inverse by @mashiike in https://github.com/mashiike/clipsight/pull/85
 
