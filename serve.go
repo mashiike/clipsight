@@ -107,6 +107,27 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			if !dashbord.IsVisible() {
 				continue
 			}
+			d, exists, err := app.DescribeDashboard(ctx, dashbord.DashboardID)
+			if err != nil {
+				slog.ErrorCtx(r.Context(), "failed describe dashboard",
+					slog.String("user_id", user.ID),
+					slog.String("error_code", "006"),
+					slog.String("detail", err.Error()),
+				)
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"code":  "006",
+					"error": "can not describe dashboard",
+				})
+				return
+			}
+			if !exists {
+				slog.WarnCtx(r.Context(), "dashboard not found",
+					slog.String("user_id", user.ID),
+					slog.String("dashboard_id", dashbord.DashboardID),
+				)
+				continue
+			}
 			output, err := qs.GenerateEmbedUrlForRegisteredUser(ctx, &quicksight.GenerateEmbedUrlForRegisteredUserInput{
 				AwsAccountId: aws.String(app.awsAccountID),
 				ExperienceConfiguration: &types.RegisteredUserEmbeddingExperienceConfiguration{
@@ -125,7 +146,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				slog.String("email", user.Email.String()),
 				slog.String("quick_sight_user_arn", user.QuickSightUserARN),
 				slog.String("dashboard_id", dashbord.DashboardID),
-				slog.String("dashboard_name", dashbord.Name),
+				slog.String("dashboard_name", *d.Name),
 			)
 			if err != nil {
 				slog.ErrorCtx(r.Context(), "failed generate embed url",
@@ -141,7 +162,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				return
 			}
 			result[fmt.Sprintf("dashbboard%d", i+1)] = map[string]interface{}{
-				"name": dashbord.Name,
+				"name": d.Name,
 				"url":  output.EmbedUrl,
 			}
 		}
