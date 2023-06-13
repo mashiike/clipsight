@@ -32,7 +32,7 @@ func (app *ClipSight) RunDeregister(ctx context.Context, opt *DeregisterOption) 
 		return nil
 	}
 	user.Enabled = false
-	if !opt.DisableOnly {
+	if opt.DisableOnly {
 		slog.DebugCtx(ctx, "try deregister user", slog.String("email", email.String()))
 		if err := app.SaveUser(ctx, user); err != nil {
 			return fmt.Errorf("update user: %w", err)
