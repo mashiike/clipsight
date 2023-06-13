@@ -146,7 +146,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 				slog.String("email", user.Email.String()),
 				slog.String("quick_sight_user_arn", user.QuickSightUserARN),
 				slog.String("dashboard_id", dashbord.DashboardID),
-				slog.String("dashboard_name", dashbord.Name),
+				slog.String("dashboard_name", *d.Name),
 			)
 			if err != nil {
 				slog.ErrorCtx(r.Context(), "failed generate embed url",

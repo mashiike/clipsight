@@ -49,7 +49,6 @@ type User struct {
 }
 
 type Dashboard struct {
-	Name        string    `yaml:"name,omitempty" json:"name,omitempty"`
 	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id" json:"dashboard_id"`
 	Expire      time.Time `dynamodb:"Expire,unixtime" yaml:"expire" json:"expire,omitempty"`
 }
@@ -117,14 +116,12 @@ func (u *User) QuickSightUserName() (string, error) {
 func (u *User) GrantDashboard(dashboard *types.Dashboard, expire time.Time) {
 	for i, d := range u.Dashboards {
 		if d.DashboardID == *dashboard.DashboardId {
-			u.Dashboards[i].Name = *dashboard.Name
 			u.Dashboards[i].Expire = expire
 			return
 		}
 	}
 	u.Dashboards = append(u.Dashboards, &Dashboard{
 		DashboardID: *dashboard.DashboardId,
-		Name:        *dashboard.Name,
 		Expire:      expire,
 	})
 }
