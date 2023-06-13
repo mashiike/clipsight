@@ -1,4 +1,8 @@
 # Changelog
+## [v0.2.4](https://github.com/mashiike/clipsight/compare/v0.2.3...v0.2.4) - 2023-06-13
+- deregister --disable-only flag is inverse by @mashiike in https://github.com/mashiike/clipsight/pull/85
+- Bump github.com/aws/aws-sdk-go from 1.44.279 to 1.44.281 by @dependabot in https://github.com/mashiike/clipsight/pull/84
+
 ## [v0.2.3](https://github.com/mashiike/clipsight/compare/v0.2.2...v0.2.3) - 2023-06-12
 - fix userName is no mask by @mashiike in https://github.com/mashiike/clipsight/pull/82
 
