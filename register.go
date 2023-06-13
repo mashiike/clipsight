@@ -10,6 +10,7 @@ import (
 
 // RegisterOption is Options for CLI Serve command
 type RegisterOption struct {
+	ID                     string    `help:"user id"`
 	Email                  string    `help:"user email address" required:""`
 	Namespace              string    `help:"quicksight namespace" default:"default" required:""`
 	IAMRoleARN             string    `help:"IAM Role arn for quicksight user" required:""`
@@ -39,6 +40,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 		slog.InfoCtx(ctx, "user not found, create new user", slog.String("id", user.ID), slog.String("email", email.String()))
 		user = NewUser(email)
 	}
+	user.ID = opt.ID
 	user.Namespace = opt.Namespace
 	user.IAMRoleARN = opt.IAMRoleARN
 	user.Region = opt.Region

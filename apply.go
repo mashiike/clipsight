@@ -54,6 +54,7 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 		if c.NeedRegister() {
 			slog.DebugCtx(ctx, "need register", slog.String("id", id), slog.String("email", c.After.Email.String()))
 			if err := app.RunRegister(ctx, &RegisterOption{
+				ID:                     c.After.ID,
 				Email:                  c.After.Email.String(),
 				Namespace:              c.After.Namespace,
 				IAMRoleARN:             c.After.IAMRoleARN,
