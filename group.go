@@ -261,3 +261,105 @@ func (app *ClipSight) DeleteQuickSightGroup(ctx context.Context, group *Group) e
 	}
 	return nil
 }
+
+func (app *ClipSight) AssignUserToGroup(ctx context.Context, user *User, group *Group) error {
+	slog.DebugCtx(ctx, "try AssignUserToGroup", slog.String("user_id", user.ID), slog.String("group_id", group.ID))
+	if user.Namespace != group.Namespace {
+		return fmt.Errorf("user and group namespace mismatch")
+	}
+	if err := app.CreateGroupMemberShip(ctx, user, group); err != nil {
+		return err
+	}
+	if ListContains(user.Groups, UserGroupMembership(group.ID)) {
+		return nil
+	}
+	user.Groups = append(user.Groups, UserGroupMembership(group.ID))
+	return app.SaveUser(ctx, user)
+}
+
+func (app *ClipSight) CreateGroupMemberShip(ctx context.Context, user *User, group *Group) error {
+	userName, err := user.QuickSightUserName()
+	if err != nil {
+		return err
+	}
+	output, err := app.qs.CreateGroupMembership(ctx, &quicksight.CreateGroupMembershipInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+		MemberName:   aws.String(userName),
+	})
+	if err != nil {
+		return err
+	}
+	if output.Status != http.StatusOK {
+		return fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return nil
+}
+
+func (app *ClipSight) UnassignUserToGroup(ctx context.Context, user *User, group *Group) error {
+	slog.DebugCtx(ctx, "try UnassignUserToGroup", slog.String("user_id", user.ID), slog.String("group_id", group.ID))
+	if err := app.DeleteGroupMemberShip(ctx, user, group); err != nil {
+		return err
+	}
+	var found bool
+	for i, g := range user.Groups {
+		if string(g) == group.ID {
+			user.Groups = append(user.Groups[:i], user.Groups[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil
+	}
+	return app.SaveUser(ctx, user)
+}
+
+func (app *ClipSight) DescribeGroupMemberShip(ctx context.Context, user *User, group *Group) (bool, error) {
+	userName, err := user.QuickSightUserName()
+	if err != nil {
+		return false, err
+	}
+	_, err = app.qs.DescribeGroupMembership(ctx, &quicksight.DescribeGroupMembershipInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+		MemberName:   aws.String(userName),
+	})
+	if err != nil {
+		var rnf *types.ResourceNotFoundException
+		if !errors.As(err, &rnf) {
+			return false, err
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func (app *ClipSight) DeleteGroupMemberShip(ctx context.Context, user *User, group *Group) error {
+	exits, err := app.DescribeGroupMemberShip(ctx, user, group)
+	if err != nil {
+		return err
+	}
+	if !exits {
+		return nil
+	}
+	userName, err := user.QuickSightUserName()
+	if err != nil {
+		return err
+	}
+	output, err := app.qs.DeleteGroupMembership(ctx, &quicksight.DeleteGroupMembershipInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+		MemberName:   aws.String(userName),
+	})
+	if err != nil {
+		return err
+	}
+	if output.Status != http.StatusOK {
+		return fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return nil
+}
