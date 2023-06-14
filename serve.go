@@ -38,6 +38,7 @@ type ServeOption struct {
 	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
 	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
+	AuthHeader                  string   `help:"auth header name for auth type is none" env:"CLIPSIGHT_AUTH_HEADER" default:"ClipSight-Auth-Email"`
 }
 
 //go:embed templates
@@ -156,7 +157,9 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 		r = r.WithContext(WithUser(r.Context(), user))
 		next.ServeHTTP(w, r)
 	}
-	switch strings.ToLower(opt.AuthType) {
+	authType := strings.ToLower(opt.AuthType)
+	slog.InfoCtx(ctx, "new auth middleware", slog.String("auth_type", authType))
+	switch authType {
 	case "google":
 		authenticationMiddleware, err := googleoidcmiddleware.New(&googleoidcmiddleware.Config{
 			ClientID:          opt.GoogleClientID,
@@ -201,6 +204,19 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 					return
 				}
 				autholization(w, r, next, Email(claims.Email()))
+			})
+		}
+		return m, nil
+	case "none":
+		m := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				email := Email(r.Header.Get(opt.AuthHeader))
+				if err := email.Validate(); err != nil {
+					slog.ErrorCtx(r.Context(), "failed validate email", slog.String("error_code", "008"), slog.String("detail", err.Error()))
+					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 008", http.StatusForbidden)
+					return
+				}
+				autholization(w, r, next, email)
 			})
 		}
 		return m, nil
