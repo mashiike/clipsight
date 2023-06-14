@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -312,7 +314,69 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := make(map[string]interface{})
-	for i, dashbord := range user.Dashboards {
+	start := 0
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		var err error
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil {
+			slog.ErrorCtx(r.Context(), "failed parse limit", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("limit", limitStr), slog.String("error_code", "011"), slog.String("detail", err.Error()))
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "011",
+				"error": "invalid limit",
+			})
+			return
+		}
+		if limit > 30 || limit < 0 {
+			slog.ErrorCtx(r.Context(), "limit over 30", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("limit", limitStr), slog.String("error_code", "011"))
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "011",
+				"error": "limit over 30",
+			})
+			return
+		}
+	}
+	if cursor := r.URL.Query().Get("cursor"); cursor != "" {
+		slog.InfoCtx(ctx, "get dashboards with cursor", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("cursor", cursor))
+		base64Str, err := base64.URLEncoding.DecodeString(cursor)
+		if err != nil {
+			slog.ErrorCtx(r.Context(), "failed decode cursor", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("cursor", cursor), slog.String("error_code", "010"), slog.String("detail", err.Error()))
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "010",
+				"error": "invalid cursor",
+			})
+			return
+		}
+		if !bytes.HasPrefix(base64Str, []byte("dashboards/")) {
+			slog.ErrorCtx(r.Context(), "invalid cursor not has dashborods prefix", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("cursor", cursor), slog.String("error_code", "010"), slog.String("decoded_cursor", string(base64Str)))
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "010",
+				"error": "invalid cursor",
+			})
+			return
+		}
+		start, err = strconv.Atoi(string(bytes.TrimPrefix(base64Str, []byte("dashboards/"))))
+		if err != nil {
+			slog.ErrorCtx(r.Context(), "failed convert cursor to int", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("cursor", cursor), slog.String("error_code", "010"), slog.String("detail", err.Error()))
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "010",
+				"error": "invalid cursor",
+			})
+			return
+		}
+	}
+	end := start + limit
+	if end > len(user.Dashboards) {
+		end = len(user.Dashboards)
+	}
+
+	for i := start; i < end; i++ {
+		dashbord := user.Dashboards[i]
 		if !dashbord.IsVisible() {
 			continue
 		}
@@ -355,11 +419,15 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 		}
 		result[fmt.Sprintf("dashbboard%d", i+1)] = resp
 	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	resp := map[string]interface{}{
 		"dashboards": result,
-	})
+		"has_next":   end < len(user.Dashboards),
+	}
+	if end < len(user.Dashboards) {
+		resp["cursor"] = base64.URLEncoding.EncodeToString([]byte(fmt.Sprintf("dashboards/%d", end+1)))
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *handler) ServeMe(w http.ResponseWriter, r *http.Request) {
@@ -375,23 +443,17 @@ func (h *handler) ServeMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	dashbaords := make([]map[string]interface{}, 0, len(user.Dashboards))
+	viewableDashboards := 0
 	for _, d := range user.Dashboards {
 		if !d.IsVisible() {
 			continue
 		}
-		dashbaord := map[string]interface{}{
-			"id": d.DashboardID,
-		}
-		if !d.Expire.IsZero() {
-			dashbaord["expire"] = d.Expire
-		}
-		dashbaords = append(dashbaords, dashbaord)
+		viewableDashboards++
 	}
 	userResp := map[string]interface{}{
-		"id":         user.ID,
-		"email":      user.Email.String(),
-		"dashboards": dashbaords,
+		"id":                  user.ID,
+		"email":               user.Email.String(),
+		"viewable_dashboards": viewableDashboards,
 	}
 	if !user.TTL.IsZero() {
 		userResp["expire"] = user.TTL
