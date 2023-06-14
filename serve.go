@@ -42,6 +42,13 @@ type ServeOption struct {
 //go:embed templates
 var defaultTemplates embed.FS
 
+type handler struct {
+	tpl     *template.Template
+	router  *httprouter.Router
+	app     *ClipSight
+	baseURL *url.URL
+}
+
 func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	authMiddleware, err := app.NewAuthMiddleware(ctx, opt)
 	if err != nil {
@@ -61,118 +68,13 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	if err != nil {
 		return fmt.Errorf("failed parse template: %w", err)
 	}
-	router := httprouter.New()
-
-	router.GET("/", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		var buf bytes.Buffer
-		if err := tpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
-			"BaseURL": opt.BaseURL,
-		}); err != nil {
-			slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
-			http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
-		}
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		io.Copy(w, &buf)
-	})
-
-	router.GET("/api/dashboards", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		ctx := r.Context()
-		w.Header().Set("Content-Type", "application/json")
-		user, ok := GetUserFromContext(r.Context())
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": "dashboars not found",
-			})
-			return
-		}
-		slog.InfoCtx(ctx, "accume role", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("iam_role", user.IAMRoleARN))
-		qs, err := app.NewQuickSightClientWithUser(ctx, user)
-		if err != nil {
-			slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
-				slog.String("user_id", user.ID),
-				slog.String("error_code", "002"),
-				slog.String("detail", err.Error()),
-			)
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"code":  "002",
-				"error": "can not initialize",
-			})
-			return
-		}
-		result := make(map[string]interface{})
-		for i, dashbord := range user.Dashboards {
-			if !dashbord.IsVisible() {
-				continue
-			}
-			d, exists, err := app.DescribeDashboard(ctx, dashbord.DashboardID)
-			if err != nil {
-				slog.ErrorCtx(r.Context(), "failed describe dashboard",
-					slog.String("user_id", user.ID),
-					slog.String("error_code", "006"),
-					slog.String("detail", err.Error()),
-				)
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"code":  "006",
-					"error": "can not describe dashboard",
-				})
-				return
-			}
-			if !exists {
-				slog.WarnCtx(r.Context(), "dashboard not found",
-					slog.String("user_id", user.ID),
-					slog.String("dashboard_id", dashbord.DashboardID),
-				)
-				continue
-			}
-			output, err := qs.GenerateEmbedUrlForRegisteredUser(ctx, &quicksight.GenerateEmbedUrlForRegisteredUserInput{
-				AwsAccountId: aws.String(app.awsAccountID),
-				ExperienceConfiguration: &types.RegisteredUserEmbeddingExperienceConfiguration{
-					Dashboard: &types.RegisteredUserDashboardEmbeddingConfiguration{
-						InitialDashboardId: aws.String(dashbord.DashboardID),
-					},
-				},
-				UserArn: aws.String(user.QuickSightUserARN),
-				AllowedDomains: []string{
-					opt.BaseURL.String(),
-				},
-				SessionLifetimeInMinutes: aws.Int64(60),
-			})
-			slog.InfoCtx(ctx, "generate embed url",
-				slog.String("user_id", user.ID),
-				slog.String("email", user.Email.String()),
-				slog.String("quick_sight_user_arn", user.QuickSightUserARN),
-				slog.String("dashboard_id", dashbord.DashboardID),
-				slog.String("dashboard_name", *d.Name),
-			)
-			if err != nil {
-				slog.ErrorCtx(r.Context(), "failed generate embed url",
-					slog.String("user_id", user.ID),
-					slog.String("error_code", "003"),
-					slog.String("detail", err.Error()),
-				)
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"code":  "003",
-					"error": "can not get embeded url",
-				})
-				return
-			}
-			result[fmt.Sprintf("dashbboard%d", i+1)] = map[string]interface{}{
-				"name": d.Name,
-				"url":  output.EmbedUrl,
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"dashboards": result,
-		})
-	})
-
+	h := &handler{
+		tpl:     tpl,
+		router:  httprouter.New(),
+		app:     app,
+		baseURL: opt.BaseURL,
+	}
+	h.SetRoute()
 	accessLoggingMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			l := accesslogger.NewAccessLog(r)
@@ -215,9 +117,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	}
 	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
 		accessLoggingMiddleware(
-			authMiddleware(
-				router,
-			),
+			authMiddleware(h),
 		),
 	)
 	return nil
@@ -232,13 +132,16 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 			return
 		}
 		if !ok {
+			slog.WarnCtx(r.Context(), "user not found", slog.Int("staus", http.StatusNotFound), slog.String("email", email.String()))
 			http.NotFound(w, r)
 			return
 		}
 		if !user.IsActive() {
+			slog.WarnCtx(r.Context(), "user is not active", slog.Int("staus", http.StatusNotFound), slog.String("user_id", user.ID), slog.String("email", email.String()))
 			http.NotFound(w, r)
 			return
 		}
+		slog.Info("auth success", slog.String("user_id", user.ID), slog.String("email", email.String()), slog.Int("dashbaords_count", len(user.Dashboards)))
 		r = r.WithContext(WithUser(r.Context(), user))
 		next.ServeHTTP(w, r)
 	}
@@ -261,12 +164,14 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 					slog.DebugCtx(r.Context(), "get claim")
 					claims, ok := googleoidcmiddleware.IDTokenClaims(r.Context())
 					if !ok {
+						slog.DebugCtx(r.Context(), "not found claim")
 						http.NotFound(w, r)
 						return
 					}
 					slog.DebugCtx(r.Context(), "check email")
 					email, ok := claims["email"].(string)
 					if !ok {
+						slog.DebugCtx(r.Context(), "not found email")
 						http.NotFound(w, r)
 						return
 					}
@@ -292,4 +197,128 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 		return nil, fmt.Errorf("unknwon auth type: %s", opt.AuthType)
 	}
 
+}
+
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.router.ServeHTTP(w, r)
+}
+
+func (h *handler) SetRoute() {
+	h.router.GET("/", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		h.ServeIndex(w, r)
+	})
+	h.router.GET("/api/dashboards", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		h.ServeDashbords(w, r)
+	})
+}
+
+func (h *handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if err := h.tpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
+		"BaseURL": h.baseURL,
+	}); err != nil {
+		slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
+		http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, &buf)
+}
+
+func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	user, ok := GetUserFromContext(r.Context())
+	if !ok {
+		slog.WarnCtx(ctx, "user context not found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "dashboars not found",
+		})
+		return
+	}
+	slog.InfoCtx(ctx, "accume role", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("iam_role", user.IAMRoleARN))
+	qs, err := h.app.NewQuickSightClientWithUser(ctx, user)
+	if err != nil {
+		slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
+			slog.String("user_id", user.ID),
+			slog.String("error_code", "002"),
+			slog.String("detail", err.Error()),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":  "002",
+			"error": "can not initialize",
+		})
+		return
+	}
+	result := make(map[string]interface{})
+	for i, dashbord := range user.Dashboards {
+		if !dashbord.IsVisible() {
+			continue
+		}
+		d, exists, err := h.app.DescribeDashboard(ctx, dashbord.DashboardID)
+		if err != nil {
+			slog.ErrorCtx(r.Context(), "failed describe dashboard",
+				slog.String("user_id", user.ID),
+				slog.String("error_code", "006"),
+				slog.String("detail", err.Error()),
+			)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "006",
+				"error": "can not describe dashboard",
+			})
+			return
+		}
+		if !exists {
+			slog.WarnCtx(r.Context(), "dashboard not found",
+				slog.String("user_id", user.ID),
+				slog.String("dashboard_id", dashbord.DashboardID),
+			)
+			continue
+		}
+		output, err := qs.GenerateEmbedUrlForRegisteredUser(ctx, &quicksight.GenerateEmbedUrlForRegisteredUserInput{
+			AwsAccountId: aws.String(h.app.awsAccountID),
+			ExperienceConfiguration: &types.RegisteredUserEmbeddingExperienceConfiguration{
+				Dashboard: &types.RegisteredUserDashboardEmbeddingConfiguration{
+					InitialDashboardId: aws.String(dashbord.DashboardID),
+				},
+			},
+			UserArn: aws.String(user.QuickSightUserARN),
+			AllowedDomains: []string{
+				h.baseURL.String(),
+			},
+			SessionLifetimeInMinutes: aws.Int64(60),
+		})
+		slog.InfoCtx(ctx, "generate embed url",
+			slog.String("user_id", user.ID),
+			slog.String("email", user.Email.String()),
+			slog.String("quick_sight_user_arn", user.QuickSightUserARN),
+			slog.String("dashboard_id", dashbord.DashboardID),
+			slog.String("dashboard_name", *d.Name),
+		)
+		if err != nil {
+			slog.ErrorCtx(r.Context(), "failed generate embed url",
+				slog.String("user_id", user.ID),
+				slog.String("error_code", "003"),
+				slog.String("detail", err.Error()),
+			)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":  "003",
+				"error": "can not get embeded url",
+			})
+			return
+		}
+		result[fmt.Sprintf("dashbboard%d", i+1)] = map[string]interface{}{
+			"name": d.Name,
+			"url":  output.EmbedUrl,
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"dashboards": result,
+	})
 }
