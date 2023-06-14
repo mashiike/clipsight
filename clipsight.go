@@ -143,24 +143,24 @@ func (app *ClipSight) DescribeDashboardParmissions(ctx context.Context, dashboar
 	return output.Permissions, nil
 }
 
-func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID string, quickSightUserARN string) error {
+func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID string, principalARN string) error {
 	permissions, err := app.DescribeDashboardParmissions(ctx, dashboardID)
 	if err != nil {
 		return fmt.Errorf("permission check: %w", err)
 	}
 
 	for _, permission := range permissions {
-		if *permission.Principal == quickSightUserARN {
+		if *permission.Principal == principalARN {
 			return nil
 		}
 	}
-	slog.DebugCtx(ctx, "try GrantDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("quick_sight_user_arn", quickSightUserARN))
+	slog.DebugCtx(ctx, "try GrantDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("principal_arn", principalARN))
 	output, err := app.qs.UpdateDashboardPermissions(ctx, &quicksight.UpdateDashboardPermissionsInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		DashboardId:  aws.String(dashboardID),
 		GrantPermissions: []types.ResourcePermission{
 			{
-				Principal: aws.String(quickSightUserARN),
+				Principal: aws.String(principalARN),
 				Actions: []string{
 					"quicksight:DescribeDashboard",
 					"quicksight:ListDashboardVersions",
@@ -178,7 +178,7 @@ func (app *ClipSight) GrantDashboardParmission(ctx context.Context, dashboardID 
 	return nil
 }
 
-func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID string, quickSightUserARN string) error {
+func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID string, principalARN string) error {
 	permissions, err := app.DescribeDashboardParmissions(ctx, dashboardID)
 	if err != nil {
 		return fmt.Errorf("permission check: %w", err)
@@ -186,14 +186,14 @@ func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID
 
 	revokePermissions := make([]types.ResourcePermission, 0)
 	for _, permission := range permissions {
-		if *permission.Principal == quickSightUserARN {
+		if *permission.Principal == principalARN {
 			revokePermissions = append(revokePermissions, permission)
 		}
 	}
 	if len(revokePermissions) == 0 {
 		return nil
 	}
-	slog.DebugCtx(ctx, "try RevokeDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("quick_sight_user_arn", quickSightUserARN))
+	slog.DebugCtx(ctx, "try RevokeDashboardParmission(%s, %s, %s)", slog.String("aws_account_id", app.awsAccountID), slog.String("dashboard_id", dashboardID), slog.String("principal_arn", principalARN))
 	output, err := app.qs.UpdateDashboardPermissions(ctx, &quicksight.UpdateDashboardPermissionsInput{
 		AwsAccountId:      aws.String(app.awsAccountID),
 		DashboardId:       aws.String(dashboardID),

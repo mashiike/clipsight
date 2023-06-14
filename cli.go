@@ -18,8 +18,8 @@ type CLI struct {
 	DDBTable  string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
 	MaskEmail bool            `help:"mask email address in log"`
 	Register  *RegisterOption `cmd:"" help:"Register user"`
-	Grant     *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
-	Revoke    *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
+	Grant     *GrantOption    `cmd:"" help:"grant dashboard view auth to user or group"`
+	Revoke    *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user or group"`
 	Serve     *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
 	Plan      *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
 	Apply     *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
@@ -88,15 +88,18 @@ func RunCLI(ctx context.Context, args []string) error {
 				if strings.Contains(a.Key, "email") && cli.MaskEmail {
 					return slog.String("email", "********")
 				}
-				if a.Key == "quick_sight_user_arn" && cli.MaskEmail {
+				if strings.Contains(a.Key, "arn") && cli.MaskEmail {
 					arn, err := arn.Parse(a.Value.String())
 					if err != nil {
-						return slog.String("quick_sight_user_arn", "********")
+						return slog.String(a.Key, "********")
+					}
+					if !strings.HasPrefix(arn.Resource, "user/") || arn.Service != "quicksight" {
+						return a
 					}
 					parts := strings.Split(arn.Resource, "/")
 					parts[len(parts)-1] = "********"
 					arn.Resource = strings.Join(parts, "/")
-					return slog.String("quick_sight_user_arn", arn.String())
+					return slog.String(a.Key, arn.String())
 				}
 				if a.Key == "quick_sight_user_name" && cli.MaskEmail {
 					parts := strings.Split(a.Value.String(), "/")
