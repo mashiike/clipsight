@@ -29,3 +29,48 @@ func GetIAMRoleName(arnStr string) (string, error) {
 	parts := strings.Split(obj.Resource, "/")
 	return parts[len(parts)-1], nil
 }
+
+type equalable[T any] interface {
+	EqualIdentifiers(T) bool
+	Equals(T) bool
+}
+
+func ListContains[T equalable[T]](list []T, item T) bool {
+	for _, listItem := range list {
+		if listItem.EqualIdentifiers(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func ListDiff[T equalable[T]](a []T, b []T) (added []T, changes []T, removed []T) {
+	for _, itemA := range a {
+		found := false
+		for _, itemB := range b {
+			if itemB.EqualIdentifiers(itemA) {
+				found = true
+				if !itemB.Equals(itemA) {
+					changes = append(changes, itemB)
+				}
+				break
+			}
+		}
+		if !found {
+			removed = append(removed, itemA)
+		}
+	}
+	for _, itemB := range b {
+		found := false
+		for _, itemA := range a {
+			if itemB.EqualIdentifiers(itemA) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			added = append(added, itemB)
+		}
+	}
+	return
+}

@@ -39,17 +39,20 @@ func (email Email) String() string {
 
 type User struct {
 	schema
-	ID                string       `dynamodb:"ID" yaml:"id" json:"id"`
-	Email             Email        `dynamodb:"Email" yaml:"email" json:"email"`
-	Namespace         string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
-	IAMRoleARN        string       `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
-	Region            string       `dynamodb:"Region" yaml:"region" json:"region"`
-	Dashboards        []*Dashboard `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
-	Enabled           bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
-	CreatedAt         time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
-	UpdatedAt         time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
-	QuickSightUserARN string       `dynamodb:"QuickSightUserARN" yaml:"-" json:"-"`
+	ID                string                `dynamodb:"ID" yaml:"id" json:"id"`
+	Email             Email                 `dynamodb:"Email" yaml:"email" json:"email"`
+	Namespace         string                `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
+	IAMRoleARN        string                `dynamodb:"IAMRoleARN" yaml:"iam_role_arn" json:"iam_role_arn"`
+	Region            string                `dynamodb:"Region" yaml:"region" json:"region"`
+	Dashboards        []*Dashboard          `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
+	Groups            []UserGroupMembership `dynamodb:"Groups" yaml:"groups" json:"groups"`
+	Enabled           bool                  `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
+	CreatedAt         time.Time             `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
+	UpdatedAt         time.Time             `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
+	QuickSightUserARN string                `dynamodb:"QuickSightUserARN" yaml:"-" json:"-"`
 }
+
+type UserGroupMembership string
 
 type Dashboard struct {
 	DashboardID string    `dynamodb:"DashboardID" yaml:"dashboard_id" json:"dashboard_id"`
@@ -198,34 +201,27 @@ func (u *User) GetDashboard(id string) (*Dashboard, bool) {
 }
 
 func (u *User) DiffPermissions(other *User) ([]*Dashboard, []*Dashboard) {
-	var grant, revoke []*Dashboard
-	if other != nil {
-		for _, d := range other.Dashboards {
-			if !d.IsVisible() {
-				continue
-			}
-			d2, ok := u.GetDashboard(d.DashboardID)
-			if !ok {
-				grant = append(grant, d)
-				continue
-			}
-			if d2.Expire != d.Expire {
-				grant = append(grant, d)
-				continue
-			}
+	a := make([]*Dashboard, 0, len(u.Dashboards))
+	for _, d := range u.Dashboards {
+		if !d.IsVisible() {
+			continue
 		}
+		a = append(a, d)
 	}
-	if u != nil {
-		for _, d := range u.Dashboards {
-			if !d.IsVisible() {
-				continue
-			}
-			if _, ok := other.GetDashboard(d.DashboardID); !ok {
-				revoke = append(revoke, d)
-			}
+	b := make([]*Dashboard, 0, len(other.Dashboards))
+	for _, d := range other.Dashboards {
+		if !d.IsVisible() {
+			continue
 		}
+		b = append(b, d)
 	}
-	return grant, revoke
+	added, changes, removed := ListDiff(a, b)
+	return append(added, changes...), removed
+}
+
+func (u *User) DiffGroups(other *User) ([]UserGroupMembership, []UserGroupMembership) {
+	added, _, removed := ListDiff(u.Groups, other.Groups)
+	return added, removed
 }
 
 func (u *User) Equals(user *User) bool {
@@ -245,6 +241,16 @@ func (u *User) Equals(user *User) bool {
 		return false
 	}
 	return u.Enabled == user.Enabled
+}
+
+func (u *User) EqualIdentifiers(user *User) bool {
+	if u == nil || user == nil {
+		return u == nil && user == nil
+	}
+	if u.Email != user.Email {
+		return false
+	}
+	return true
 }
 
 func (u *User) EqualDashboardPermissions(user *User) bool {
@@ -273,6 +279,34 @@ func (d *Dashboard) IsVisible() bool {
 		return true
 	}
 	return flextime.Now().UnixNano() < d.Expire.UnixNano()
+}
+
+func (d *Dashboard) Equals(other *Dashboard) bool {
+	if d == nil || other == nil {
+		return d == nil && other == nil
+	}
+	if d.DashboardID != other.DashboardID {
+		return false
+	}
+	return d.Expire.Equal(other.Expire)
+}
+
+func (d *Dashboard) EqualIdentifiers(other *Dashboard) bool {
+	if d == nil || other == nil {
+		return d == nil && other == nil
+	}
+	if d.DashboardID != other.DashboardID {
+		return false
+	}
+	return true
+}
+
+func (m UserGroupMembership) Equals(other UserGroupMembership) bool {
+	return m.EqualIdentifiers(other)
+}
+
+func (m UserGroupMembership) EqualIdentifiers(other UserGroupMembership) bool {
+	return m == other
 }
 
 func (app *ClipSight) GetUser(ctx context.Context, email Email) (*User, bool, error) {
@@ -447,7 +481,7 @@ func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
 			wg.Done()
 		}()
 		slog.DebugCtx(ctx, "list users start")
-		iter := app.ddbTable().Scan().Iter()
+		iter := app.ddbTable().Scan().Filter("'HashKey' = ?", "USER").Iter()
 		for {
 			var user User
 			isContinue := iter.NextWithContext(ctx, &user)
