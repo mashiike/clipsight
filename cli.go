@@ -69,6 +69,7 @@ func RunCLI(ctx context.Context, args []string) error {
 			slog.LevelError: slogutils.Color(color.FgRed, color.Bold),
 		},
 		RecordTransformerFuncs: []slogutils.RecordTransformerFunc{
+			slogutils.UniqueAttrs(),
 			slogutils.ConvertLegacyLevel(
 				map[string]slog.Level{
 					"debug":  slog.LevelDebug,

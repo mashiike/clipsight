@@ -27,6 +27,9 @@ import (
 type Email string
 
 func (email Email) Validate() error {
+	if email == "" {
+		return errors.New("email is empty")
+	}
 	_, err := mail.ParseAddress(string(email))
 	return err
 }
