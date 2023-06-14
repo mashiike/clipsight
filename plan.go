@@ -46,29 +46,29 @@ func (app *ClipSight) runPlan(ctx context.Context, opt *PlanOption) ([]*ChangeIn
 		} else {
 			fmt.Fprintln(&details, change.UnmaskString())
 		}
-		if change.Before == nil {
+		if change.BeforeUser == nil {
 			created++
 			email := "********"
 			if !app.maskEmail {
-				email = change.After.Email.String()
+				email = change.AfterUser.Email.String()
 			}
-			createdUsers = append(createdUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.After.ID, email, change.After.Namespace))
+			createdUsers = append(createdUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.AfterUser.ID, email, change.AfterUser.Namespace))
 			continue
 		}
-		if change.After == nil {
+		if change.AfterUser == nil {
 			deleted++
 			email := "********"
 			if !app.maskEmail {
-				email = change.Before.Email.String()
+				email = change.BeforeUser.Email.String()
 			}
-			deletedUsers = append(deletedUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.Before.ID, email, change.Before.Namespace))
+			deletedUsers = append(deletedUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.BeforeUser.ID, email, change.BeforeUser.Namespace))
 			continue
 		}
 		email := "********"
 		if !app.maskEmail {
-			email = change.After.Email.String()
+			email = change.AfterUser.Email.String()
 		}
-		changeUsers = append(changeUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.After.ID, email, change.After.Namespace))
+		changeUsers = append(changeUsers, fmt.Sprintf("user_id=%s(email:%s, namespace:%s)", change.AfterUser.ID, email, change.AfterUser.Namespace))
 
 	}
 	resourceChangeSummary := fmt.Sprintf("Plan: %d to create, %d to changes, %d to delete.\n\n", created, len(changes)-created-deleted, deleted)

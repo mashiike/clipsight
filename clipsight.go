@@ -209,8 +209,10 @@ func (app *ClipSight) RevokeDashboardParmission(ctx context.Context, dashboardID
 }
 
 type ChangeInfo struct {
-	Before *User
-	After  *User
+	BeforeGroup *Group
+	AfterGroup  *Group
+	BeforeUser  *User
+	AfterUser   *User
 }
 
 func (c *ChangeInfo) String() string {
@@ -226,20 +228,20 @@ func (c *ChangeInfo) diffString(mask bool) string {
 	builder.WriteString("QuickSightUser: ")
 	var userName string
 	var email string
-	if c.Before != nil {
-		userName, _ = c.Before.QuickSightUserName()
-		email = c.Before.Email.String()
+	if c.BeforeUser != nil {
+		userName, _ = c.BeforeUser.QuickSightUserName()
+		email = c.BeforeUser.Email.String()
 	}
-	if userName == "" && c.After != nil {
-		userName, _ = c.After.QuickSightUserName()
-		email = c.After.Email.String()
+	if userName == "" && c.AfterUser != nil {
+		userName, _ = c.AfterUser.QuickSightUserName()
+		email = c.AfterUser.Email.String()
 	}
 	if mask {
 		userName = strings.ReplaceAll(userName, email, "******")
 	}
 	builder.WriteString(userName)
 	builder.WriteString("\n")
-	diffStr, err := c.Before.Diff(c.After, mask)
+	diffStr, err := c.BeforeUser.Diff(c.AfterUser, mask)
 	if err != nil {
 		fmt.Fprintf(&builder, "diff print error: %s\n", err)
 	} else {
@@ -249,22 +251,36 @@ func (c *ChangeInfo) diffString(mask bool) string {
 	return builder.String()
 }
 
+func (c *ChangeInfo) IsUserChange() bool {
+	return c.BeforeUser != nil || c.AfterUser != nil
+}
+
+func (c *ChangeInfo) IsGroupChange() bool {
+	return c.BeforeGroup != nil || c.AfterGroup != nil
+}
+
 func (c *ChangeInfo) NeedRegister() bool {
-	if c.After == nil {
+	if !c.IsUserChange() {
 		return false
 	}
-	return !c.Before.Equals(c.After) && c.After.Enabled
+	if c.AfterUser == nil {
+		return false
+	}
+	return !c.BeforeUser.Equals(c.AfterUser) && c.AfterUser.Enabled
 }
 
 func (c *ChangeInfo) NeedPermissionModify() bool {
-	if c.After == nil {
+	if c.AfterUser == nil && c.AfterGroup == nil {
 		return false
 	}
-	return !c.Before.EqualDashboardPermissions(c.After)
+	return !c.BeforeUser.EqualDashboardPermissions(c.AfterUser) || !c.BeforeGroup.EqualDashboardPermissions(c.AfterGroup)
 }
 
 func (c *ChangeInfo) NeedDeregister() bool {
-	return c.After == nil
+	if !c.IsUserChange() {
+		return false
+	}
+	return c.AfterUser == nil
 }
 
 func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config, silent bool) ([]*ChangeInfo, error) {
@@ -304,8 +320,8 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 				slog.InfoCtx(ctx, "plan delete user", slog.String("id", ddbUser.ID), slog.String("quick_sight_user_name", userName))
 			}
 			changes = append(changes, &ChangeInfo{
-				Before: ddbUser,
-				After:  nil,
+				BeforeUser: ddbUser,
+				AfterUser:  nil,
 			})
 			continue
 		}
@@ -316,8 +332,8 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 			slog.InfoCtx(ctx, "plan change user", slog.String("id", ddbUser.ID), slog.String("quick_sight_user_name", userName))
 		}
 		changes = append(changes, &ChangeInfo{
-			Before: ddbUser,
-			After:  user,
+			BeforeUser: ddbUser,
+			AfterUser:  user,
 		})
 	}
 	for _, user := range cfg.Users {
@@ -335,8 +351,8 @@ func (app *ClipSight) PlanSyncConfigToDynamoDB(ctx context.Context, cfg *Config,
 			slog.InfoCtx(ctx, "plan create user", slog.String("id", user.ID), slog.String("quick_sight_user_name", userName))
 		}
 		changes = append(changes, &ChangeInfo{
-			Before: nil,
-			After:  user,
+			BeforeUser: nil,
+			AfterUser:  user,
 		})
 	}
 	return changes, nil
