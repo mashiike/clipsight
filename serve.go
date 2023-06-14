@@ -34,6 +34,7 @@ type ServeOption struct {
 	Prefix                      string   `help:"site prefix" default:"/" env:"CLIPSIGHT_PREFIX"`
 	APIOnly                     bool     `help:"API only mode" env:"CLIPSIGHT_API_ONLY"`
 	Templates                   string   `help:"Path for index.html template dir" type:"path" env:"CLIPSIGHT_TEMPLATES"`
+	Static                      string   `help:"Path for static files" type:"path" env:"CLIPSIGHT_STATIC"`
 	AuthType                    string   `help:"Types of Authentication" enum:"google,aws,none" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
 	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
@@ -46,15 +47,17 @@ var defaultTemplates embed.FS
 
 type handler struct {
 	tpl     *template.Template
+	static  http.Handler
 	router  *chi.Mux
 	app     *ClipSight
 	baseURL *url.URL
 }
 
-func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template, middlewares chi.Middlewares) *handler {
+func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template, static http.Handler, middlewares chi.Middlewares) *handler {
 	h := &handler{
 		tpl:     tpl,
 		router:  chi.NewRouter(),
+		static:  static,
 		app:     app,
 		baseURL: baseURL,
 	}
@@ -122,8 +125,11 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			next.ServeHTTP(responseWriter, r)
 		})
 	}
-
-	h := app.newHandler(opt.BaseURL, tpl, chi.Middlewares{
+	var static http.Handler
+	if opt.Static != "" {
+		static = http.StripPrefix(opt.Prefix, http.FileServer(http.Dir(opt.Static)))
+	}
+	h := app.newHandler(opt.BaseURL, tpl, static, chi.Middlewares{
 		middleware.RequestID,
 		middleware.RealIP,
 		accessLoggingMiddleware,
@@ -237,6 +243,9 @@ func (h *handler) Use(middleware func(http.Handler) http.Handler) {
 func (h *handler) SetRoute() {
 	if h.tpl != nil {
 		h.router.Get("/", h.ServeIndex)
+	}
+	if h.static != nil {
+		h.router.Get("/static/*", http.StripPrefix("/static/", h.static).ServeHTTP)
 	}
 	h.router.Route("/api", func(r chi.Router) {
 		r.Get("/dashboards", h.ServeDashbords)
