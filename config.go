@@ -56,6 +56,7 @@ func (c *sopsConfig) IsEncrypted() bool {
 type Config struct {
 	RequiredVersion VersionConstraint `yaml:"required_version"`
 	Users           []*User           `yaml:"users"`
+	Groups          []*Group          `yaml:"groups"`
 }
 
 func (c *Config) Merge(other *Config) {

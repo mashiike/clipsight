@@ -59,6 +59,9 @@ func TestLoadConfig(t *testing.T) {
 						Expire:      time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 					},
 				},
+				Groups: []clipsight.UserGroupMembership{
+					"admin",
+				},
 				Enabled: true,
 			},
 			{
