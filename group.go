@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/Songmu/flextime"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/guregu/dynamo"
 	"golang.org/x/exp/slog"
@@ -20,6 +23,7 @@ type Group struct {
 	Namespace          string       `dynamodb:"Namespace" yaml:"namespace" json:"namespace"`
 	Dashboards         []*Dashboard `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
 	Region             string       `dynamodb:"Region" yaml:"region" json:"region"`
+	Enabled            bool         `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
 	CreatedAt          time.Time    `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
 	UpdatedAt          time.Time    `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
 	QuickSightGroupARN string       `dynamodb:"QuickSightGroupARN" yaml:"-" json:"-"`
@@ -61,6 +65,13 @@ func (g *Group) FillKey() *Group {
 
 func (g *Group) IsNew() bool {
 	return g.Revision == 0
+}
+
+func (g *Group) IsActive() bool {
+	if g.schema.IsExpire() {
+		return false
+	}
+	return g.Enabled
 }
 
 func (g *Group) GrantDashboard(dashboard *types.Dashboard, expire time.Time) {
@@ -185,4 +196,68 @@ func (app *ClipSight) SaveGroup(ctx context.Context, group *Group) error {
 		putOp = putOp.If("Revision = ?", rev)
 	}
 	return putOp.RunWithContext(ctx)
+}
+
+func (app *ClipSight) DeleteGroup(ctx context.Context, group *Group) error {
+	return app.ddbTable().Delete("HashKey", group.HashKey).Range("SortKey", group.SortKey).RunWithContext(ctx)
+}
+
+func (app *ClipSight) CreateQuickSightGroup(ctx context.Context, group *Group) (*types.Group, error) {
+	slog.DebugCtx(ctx, "try CreateQuicksightGroup", slog.String("group_id", group.ID))
+	output, err := app.qs.CreateGroup(ctx, &quicksight.CreateGroupInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+		Description:  aws.String("Managed by ClipSight. "),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if output.Status != http.StatusCreated {
+		return nil, fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return output.Group, nil
+}
+
+func (app *ClipSight) DescribeQuickSightGroup(ctx context.Context, group *Group) (*types.Group, bool, error) {
+	slog.DebugCtx(ctx, "try DescribeQuicksightGroup", slog.String("group_id", group.ID))
+	output, err := app.qs.DescribeGroup(ctx, &quicksight.DescribeGroupInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+	})
+	if err != nil {
+		var rnf *types.ResourceNotFoundException
+		if !errors.As(err, &rnf) {
+			return nil, false, err
+		}
+		return nil, false, nil
+	}
+	if output.Status != http.StatusOK {
+		return nil, false, fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return output.Group, true, nil
+}
+
+func (app *ClipSight) DeleteQuickSightGroup(ctx context.Context, group *Group) error {
+	_, exists, err := app.DescribeQuickSightGroup(ctx, group)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	slog.DebugCtx(ctx, "try DeleteQuicksightGroup", slog.String("group_id", group.ID))
+	output, err := app.qs.DeleteGroup(ctx, &quicksight.DeleteGroupInput{
+		AwsAccountId: aws.String(app.awsAccountID),
+		Namespace:    aws.String(group.Namespace),
+		GroupName:    aws.String(group.ID),
+	})
+	if err != nil {
+		return err
+	}
+	if output.Status != http.StatusOK {
+		return fmt.Errorf("HTTP Status %d", output.Status)
+	}
+	return nil
 }
