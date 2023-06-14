@@ -15,6 +15,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/ridge v0.6.1
+	github.com/go-chi/chi v1.5.4
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/google/uuid v1.3.0
 	github.com/guregu/dynamo v1.19.0

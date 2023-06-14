@@ -19,8 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	validator "github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/fujiwara/ridge"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/mashiike/accesslogger"
 	googleoidcmiddleware "github.com/mashiike/google-oidc-middleware"
 	"github.com/mashiike/slogutils"
@@ -32,8 +32,9 @@ type ServeOption struct {
 	BaseURL                     *url.URL `help:"site base url" env:"CLIPSIGHT_BASE_URL" default:"http://localhost:8080"`
 	Addr                        string   `help:"local server address" env:"CLIPSIGHT_ADDR" default:":8080"`
 	Prefix                      string   `help:"site prefix" default:"/" env:"CLIPSIGHT_PREFIX"`
+	APIOnly                     bool     `help:"API only mode" env:"CLIPSIGHT_API_ONLY"`
 	Templates                   string   `help:"Path for index.html template dir" type:"path" env:"CLIPSIGHT_TEMPLATES"`
-	AuthType                    string   `help:"Types of Authentication" enum:"google,aws" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
+	AuthType                    string   `help:"Types of Authentication" enum:"google,aws,none" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
 	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
 	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
@@ -49,12 +50,15 @@ type handler struct {
 	baseURL *url.URL
 }
 
-func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template) *handler {
+func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template, middlewares chi.Middlewares) *handler {
 	h := &handler{
 		tpl:     tpl,
 		router:  chi.NewRouter(),
 		app:     app,
 		baseURL: baseURL,
+	}
+	for _, m := range middlewares {
+		h.router.Use(m)
 	}
 	h.SetRoute()
 	return h
@@ -79,15 +83,11 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	if err != nil {
 		return fmt.Errorf("failed parse template: %w", err)
 	}
-	h := app.newHandler(opt.BaseURL, tpl)
 
 	accessLoggingMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			l := accesslogger.NewAccessLog(r)
-			reqId := r.Header.Get("X-Request-Id")
-			if reqId == "" {
-				reqId = uuid.New().String()
-			}
+			reqId := middleware.GetReqID(r.Context())
 			ctx := slogutils.With(r.Context(), slog.String("request_id", reqId))
 			responseWriter := &accesslogger.ResponseWriter{
 				ResponseWriter: w,
@@ -121,11 +121,16 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			next.ServeHTTP(responseWriter, r)
 		})
 	}
-	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix,
-		accessLoggingMiddleware(
-			authMiddleware(h),
-		),
-	)
+
+	h := app.newHandler(opt.BaseURL, tpl, chi.Middlewares{
+		middleware.RequestID,
+		middleware.RealIP,
+		accessLoggingMiddleware,
+		middleware.Recoverer,
+		authMiddleware,
+	})
+
+	ridge.RunWithContext(ctx, opt.Addr, opt.Prefix, h)
 	return nil
 }
 
