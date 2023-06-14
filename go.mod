@@ -15,10 +15,10 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/ridge v0.6.1
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/google/uuid v1.3.0
 	github.com/guregu/dynamo v1.19.0
 	github.com/hashicorp/go-version v1.6.0
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mashiike/accesslogger v0.2.0
 	github.com/mashiike/google-oidc-middleware v0.1.0
 	github.com/mashiike/slogutils v0.2.1

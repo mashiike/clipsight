@@ -19,8 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	validator "github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/fujiwara/ridge"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/julienschmidt/httprouter"
 	"github.com/mashiike/accesslogger"
 	googleoidcmiddleware "github.com/mashiike/google-oidc-middleware"
 	"github.com/mashiike/slogutils"
@@ -44,9 +44,20 @@ var defaultTemplates embed.FS
 
 type handler struct {
 	tpl     *template.Template
-	router  *httprouter.Router
+	router  *chi.Mux
 	app     *ClipSight
 	baseURL *url.URL
+}
+
+func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template) *handler {
+	h := &handler{
+		tpl:     tpl,
+		router:  chi.NewRouter(),
+		app:     app,
+		baseURL: baseURL,
+	}
+	h.SetRoute()
+	return h
 }
 
 func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
@@ -68,13 +79,8 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	if err != nil {
 		return fmt.Errorf("failed parse template: %w", err)
 	}
-	h := &handler{
-		tpl:     tpl,
-		router:  httprouter.New(),
-		app:     app,
-		baseURL: opt.BaseURL,
-	}
-	h.SetRoute()
+	h := app.newHandler(opt.BaseURL, tpl)
+
 	accessLoggingMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			l := accesslogger.NewAccessLog(r)
@@ -203,12 +209,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.router.ServeHTTP(w, r)
 }
 
+func (h *handler) Use(middleware func(http.Handler) http.Handler) {
+	h.router.Use(middleware)
+}
+
 func (h *handler) SetRoute() {
-	h.router.GET("/", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		h.ServeIndex(w, r)
-	})
-	h.router.GET("/api/dashboards", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		h.ServeDashbords(w, r)
+	if h.tpl != nil {
+		h.router.Get("/", h.ServeIndex)
+	}
+	h.router.Route("/api", func(r chi.Router) {
+		r.Get("/dashboards", h.ServeDashbords)
 	})
 }
 
