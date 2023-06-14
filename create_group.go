@@ -13,7 +13,7 @@ type CreateGroupOption struct {
 	GroupID               string    `help:"group id"`
 	Namespace             string    `help:"quicksight namespace" default:"default" required:""`
 	Region                string    `help:"quicksight user region" env:"AWS_DEFAULT_REGION" required:""`
-	CreateQuickSightGroup bool      `name:"register-quicksight-group" help:"if quicksight group not exists, create this"`
+	CreateQuickSightGroup bool      `name:"create-quicksight-group" help:"if quicksight group not exists, create this"`
 	ExpireDate            time.Time `help:"Expiration date for this group (RFC3399)"`
 	Disabled              bool      `help:"disable user"`
 }

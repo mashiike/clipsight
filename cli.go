@@ -14,16 +14,18 @@ import (
 )
 
 type CLI struct {
-	LogLevel  string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
-	DDBTable  string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
-	MaskEmail bool            `help:"mask email address in log"`
-	Register  *RegisterOption `cmd:"" help:"Register user"`
-	Grant     *GrantOption    `cmd:"" help:"grant dashboard view auth to user or group"`
-	Revoke    *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user or group"`
-	Serve     *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
-	Plan      *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
-	Apply     *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
-	Version   struct{}        `cmd:"" help:"Show version"`
+	LogLevel    string             `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
+	DDBTable    string             `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
+	MaskEmail   bool               `help:"mask email address in log"`
+	Register    *RegisterOption    `cmd:"" help:"Register user"`
+	Grant       *GrantOption       `cmd:"" help:"grant dashboard view auth to user or group"`
+	Revoke      *RevokeOption      `cmd:"" help:"revoke dashboard view auth from user or group"`
+	Serve       *ServeOption       `cmd:"" help:"Start a ClipSight server" default:"withargs"`
+	Plan        *PlanOption        `cmd:"" help:"Plan of sync config and DynamoDB"`
+	Apply       *ApplyOption       `cmd:"" help:"Apply sync config and DynamoDB"`
+	CreateGroup *CreateGroupOption `cmd:"" help:"Create group"`
+	DeleteGroup *DeleteGroupOption `cmd:"" help:"Delete group"`
+	Version     struct{}           `cmd:"" help:"Show version"`
 }
 
 var (
@@ -155,6 +157,10 @@ func (app *ClipSight) Dispatch(ctx context.Context, command string, cli *CLI) er
 		return app.RunPlan(ctx, cli.Plan)
 	case "apply":
 		return app.RunApply(ctx, cli.Apply)
+	case "create-group":
+		return app.RunCreateGroup(ctx, cli.CreateGroup)
+	case "delete-group":
+		return app.RunDeleteGroup(ctx, cli.DeleteGroup)
 	case "version":
 		return nil
 	}
