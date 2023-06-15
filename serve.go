@@ -371,22 +371,30 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	end := start + limit
-	if end > len(user.Dashboards) {
-		end = len(user.Dashboards)
+	dashboards, err := h.app.GetVisibleDashboardIDs(ctx, user)
+	if err != nil {
+		slog.ErrorCtx(r.Context(), "failed get visible dashboards", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("error_code", "013"), slog.String("detail", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":  "013",
+			"error": "can not get visible dashboards",
+		})
+		return
+	}
+
+	if end > len(dashboards) {
+		end = len(dashboards)
 	}
 
 	for i := start; i < end; i++ {
-		dashbord := user.Dashboards[i]
-		if !dashbord.IsVisible() {
-			continue
-		}
+		dashbord := dashboards[i]
 		slog.InfoCtx(ctx, "generate embed url",
 			slog.String("user_id", user.ID),
 			slog.String("email", user.Email.String()),
 			slog.String("quick_sight_user_arn", user.QuickSightUserARN),
-			slog.String("dashboard_id", dashbord.DashboardID),
+			slog.String("dashboard_id", dashbord),
 		)
-		resp, exists, err := h.generateEmbedUrl(ctx, qs, user.QuickSightUserARN, dashbord.DashboardID)
+		resp, exists, err := h.generateEmbedUrl(ctx, qs, user.QuickSightUserARN, dashbord)
 		if err != nil {
 			var e *ErrorResponse
 			if errors.As(err, &e) {
@@ -413,7 +421,7 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 		if !exists {
 			slog.WarnCtx(r.Context(), "dashboard not found",
 				slog.String("user_id", user.ID),
-				slog.String("dashboard_id", dashbord.DashboardID),
+				slog.String("dashboard_id", dashbord),
 			)
 			continue
 		}
@@ -443,17 +451,20 @@ func (h *handler) ServeMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	viewableDashboards := 0
-	for _, d := range user.Dashboards {
-		if !d.IsVisible() {
-			continue
-		}
-		viewableDashboards++
+	dashbords, err := h.app.GetVisibleDashboardIDs(ctx, user)
+	if err != nil {
+		slog.ErrorCtx(ctx, "failed get visible dashboards", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("error_code", "013"), slog.String("detail", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":  "013",
+			"error": "can not get visible dashboards",
+		})
+		return
 	}
 	userResp := map[string]interface{}{
 		"id":                  user.ID,
 		"email":               user.Email.String(),
-		"viewable_dashboards": viewableDashboards,
+		"viewable_dashboards": dashbords,
 	}
 	if !user.TTL.IsZero() {
 		userResp["expire"] = user.TTL
@@ -496,10 +507,24 @@ func (h *handler) ServeDashbord(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	dashboards, err := h.app.GetVisibleDashboardIDs(r.Context(), user)
+	if err != nil {
+		slog.ErrorCtx(r.Context(), "failed get visible dashboards",
+			slog.String("user_id", user.ID),
+			slog.String("error_code", "013"),
+			slog.String("detail", err.Error()),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":  "013",
+			"error": "can not get visible dashboards",
+		})
+		return
+	}
 	var visible bool
-	for _, d := range user.Dashboards {
-		if d.DashboardID == dashboardID {
-			visible = d.IsVisible()
+	for _, d := range dashboards {
+		if d == dashboardID {
+			visible = true
 		}
 	}
 	if !visible {

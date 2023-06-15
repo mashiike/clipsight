@@ -499,6 +499,37 @@ func (app *ClipSight) NewQuickSightClientWithUser(ctx context.Context, user *Use
 	return quicksight.NewFromConfig(awsCfgV2), nil
 }
 
+func (app *ClipSight) GetVisibleDashboardIDs(ctx context.Context, user *User) ([]string, error) {
+	slog.DebugCtx(ctx, "try GetVisibleDashboards", slog.String("user_id", user.ID), slog.String("email", user.Email.String()))
+	dashboards := make(map[string]bool)
+	for _, d := range user.Dashboards {
+		if !d.IsVisible() {
+			continue
+		}
+		dashboards[d.DashboardID] = true
+	}
+	for _, g := range user.Groups {
+		group, exists, err := app.GetGroup(ctx, g.GroupID())
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			continue
+		}
+		for _, d := range group.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			dashboards[d.DashboardID] = true
+		}
+	}
+	dashboardIDs := make([]string, 0, len(dashboards))
+	for id := range dashboards {
+		dashboardIDs = append(dashboardIDs, id)
+	}
+	return dashboardIDs, nil
+}
+
 func (app *ClipSight) ListUsers(ctx context.Context) (<-chan *User, func()) {
 	ch := make(chan *User, 100)
 	var wg sync.WaitGroup
