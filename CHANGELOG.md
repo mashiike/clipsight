@@ -1,4 +1,8 @@
 # Changelog
+## [v0.3.0](https://github.com/mashiike/clipsight/compare/v0.2.5...v0.3.0) - 2023-06-15
+- API Only mode for custom frontend by @mashiike in https://github.com/mashiike/clipsight/pull/91
+- group management by @mashiike in https://github.com/mashiike/clipsight/pull/93
+
 ## [v0.2.5](https://github.com/mashiike/clipsight/compare/v0.2.4...v0.2.5) - 2023-06-13
 - id set, on register by @mashiike in https://github.com/mashiike/clipsight/pull/88
 - check Dashboard exists on serve embeded by @mashiike in https://github.com/mashiike/clipsight/pull/90
