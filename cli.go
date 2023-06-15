@@ -14,16 +14,20 @@ import (
 )
 
 type CLI struct {
-	LogLevel  string          `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
-	DDBTable  string          `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
-	MaskEmail bool            `help:"mask email address in log"`
-	Register  *RegisterOption `cmd:"" help:"Register user"`
-	Grant     *GrantOption    `cmd:"" help:"grant dashboard view auth to user"`
-	Revoke    *RevokeOption   `cmd:"" help:"revoke dashboard view auth from user"`
-	Serve     *ServeOption    `cmd:"" help:"Start a ClipSight server" default:"withargs"`
-	Plan      *PlanOption     `cmd:"" help:"Plan of sync config and DynamoDB"`
-	Apply     *ApplyOption    `cmd:"" help:"Apply sync config and DynamoDB"`
-	Version   struct{}        `cmd:"" help:"Show version"`
+	LogLevel      string               `help:"output log level" env:"CLIPSIGHT_LOG_LEVEL" default:"info"`
+	DDBTable      string               `help:"DynamoDB table name for user infomation" env:"CLIPSIGHT_DDB_TABLE" default:"clipsight"`
+	MaskEmail     bool                 `help:"mask email address in log"`
+	Register      *RegisterOption      `cmd:"" help:"Register user"`
+	Grant         *GrantOption         `cmd:"" help:"grant dashboard view auth to user or group"`
+	Revoke        *RevokeOption        `cmd:"" help:"revoke dashboard view auth from user or group"`
+	Serve         *ServeOption         `cmd:"" help:"Start a ClipSight server" default:"withargs"`
+	Plan          *PlanOption          `cmd:"" help:"Plan of sync config and DynamoDB"`
+	Apply         *ApplyOption         `cmd:"" help:"Apply sync config and DynamoDB"`
+	CreateGroup   *CreateGroupOption   `cmd:"" help:"Create group"`
+	DeleteGroup   *DeleteGroupOption   `cmd:"" help:"Delete group"`
+	AssignGroup   *AssignGroupOption   `cmd:"" help:"Assign user to group"`
+	UnassignGroup *UnassignGroupOption `cmd:"" help:"Unassign user from group"`
+	Version       struct{}             `cmd:"" help:"Show version"`
 }
 
 var (
@@ -83,20 +87,24 @@ func RunCLI(ctx context.Context, args []string) error {
 		},
 		Writer: os.Stderr,
 		HandlerOptions: &slog.HandlerOptions{
-			Level: minLevel,
+			AddSource: minLevel <= slog.LevelDebug,
+			Level:     minLevel,
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if strings.Contains(a.Key, "email") && cli.MaskEmail {
 					return slog.String("email", "********")
 				}
-				if a.Key == "quick_sight_user_arn" && cli.MaskEmail {
+				if strings.Contains(a.Key, "arn") && cli.MaskEmail {
 					arn, err := arn.Parse(a.Value.String())
 					if err != nil {
-						return slog.String("quick_sight_user_arn", "********")
+						return slog.String(a.Key, "********")
+					}
+					if !strings.HasPrefix(arn.Resource, "user/") || arn.Service != "quicksight" {
+						return a
 					}
 					parts := strings.Split(arn.Resource, "/")
 					parts[len(parts)-1] = "********"
 					arn.Resource = strings.Join(parts, "/")
-					return slog.String("quick_sight_user_arn", arn.String())
+					return slog.String(a.Key, arn.String())
 				}
 				if a.Key == "quick_sight_user_name" && cli.MaskEmail {
 					parts := strings.Split(a.Value.String(), "/")
@@ -152,6 +160,14 @@ func (app *ClipSight) Dispatch(ctx context.Context, command string, cli *CLI) er
 		return app.RunPlan(ctx, cli.Plan)
 	case "apply":
 		return app.RunApply(ctx, cli.Apply)
+	case "create-group":
+		return app.RunCreateGroup(ctx, cli.CreateGroup)
+	case "delete-group":
+		return app.RunDeleteGroup(ctx, cli.DeleteGroup)
+	case "assign-group":
+		return app.RunAssignGroup(ctx, cli.AssignGroup)
+	case "unassign-group":
+		return app.RunUnassignGroup(ctx, cli.UnassignGroup)
 	case "version":
 		return nil
 	}

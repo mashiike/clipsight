@@ -26,6 +26,9 @@ func TestUser__Diff_Change(t *testing.T) {
 				Expire:      time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 			},
 		},
+		Groups: []clipsight.UserGroupMembership{
+			"tset",
+		},
 		Enabled: true,
 	}
 	user.Restrict()
@@ -42,6 +45,9 @@ func TestUser__Diff_Change(t *testing.T) {
 			{
 				DashboardID: "00000000-0000-0000-0000-000000000000",
 			},
+		},
+		Groups: []clipsight.UserGroupMembership{
+			"test",
 		},
 		Enabled: true,
 	}
@@ -74,6 +80,9 @@ func TestUser__Diff_Add(t *testing.T) {
 				DashboardID: "12345678-1234-1234-1234-123456789012",
 				Expire:      time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 			},
+		},
+		Groups: []clipsight.UserGroupMembership{
+			"test",
 		},
 		Enabled: true,
 	}
@@ -111,6 +120,9 @@ func TestUser__Diff_Delete(t *testing.T) {
 				DashboardID: "00000000-0000-0000-0000-000000000000",
 			},
 		},
+		Groups: []clipsight.UserGroupMembership{
+			"test",
+		},
 		Enabled: true,
 	}
 	other.Restrict()
@@ -142,6 +154,9 @@ func TestUser__Equal__Same(t *testing.T) {
 				DashboardID: "00000000-0000-0000-0000-000000000000",
 			},
 		},
+		Groups: []clipsight.UserGroupMembership{
+			"test",
+		},
 		Enabled:           true,
 		CreatedAt:         time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 		UpdatedAt:         time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
@@ -160,6 +175,9 @@ func TestUser__Equal__Same(t *testing.T) {
 				DashboardID: "12345678-1234-1234-1234-123456789012",
 				Expire:      time.Time(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 			},
+		},
+		Groups: []clipsight.UserGroupMembership{
+			"test",
 		},
 		Enabled: true,
 	}
