@@ -87,7 +87,8 @@ func RunCLI(ctx context.Context, args []string) error {
 		},
 		Writer: os.Stderr,
 		HandlerOptions: &slog.HandlerOptions{
-			Level: minLevel,
+			AddSource: minLevel <= slog.LevelDebug,
+			Level:     minLevel,
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if strings.Contains(a.Key, "email") && cli.MaskEmail {
 					return slog.String("email", "********")

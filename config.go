@@ -92,10 +92,21 @@ func (c *Config) Validate() error {
 	if !c.RequiredVersion.Check(Version) {
 		return fmt.Errorf("version %s is not satisfied", Version)
 	}
+	groups := map[string]struct{}{}
+	for _, group := range c.Groups {
+		if _, ok := groups[group.ID]; ok {
+			return fmt.Errorf("duplicate group %s", group.ID)
+		}
+	}
 	users := map[string]struct{}{}
 	for _, user := range c.Users {
 		if _, ok := users[user.Email.String()]; ok {
 			return fmt.Errorf("duplicate user %s", user.Email)
+		}
+		for _, group := range user.Groups {
+			if _, ok := groups[group.GroupID()]; !ok {
+				return fmt.Errorf("group %s is not defined", group)
+			}
 		}
 	}
 	return nil

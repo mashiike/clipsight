@@ -365,7 +365,7 @@ func (app *ClipSight) CreateGroupMemberShip(ctx context.Context, user *User, gro
 func (app *ClipSight) UnassignUserToGroup(ctx context.Context, user *User, group *Group) error {
 	slog.DebugCtx(ctx, "try UnassignUserToGroup", slog.String("user_id", user.ID), slog.String("group_id", group.ID))
 	if err := app.DeleteGroupMemberShip(ctx, user, group); err != nil {
-		return err
+		return fmt.Errorf("failed to delete group membership: %w", err)
 	}
 	var found bool
 	for i, g := range user.Groups {

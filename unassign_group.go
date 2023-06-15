@@ -27,7 +27,8 @@ func (app *ClipSight) RunUnassignGroup(ctx context.Context, opt *UnassignGroupOp
 		return fmt.Errorf("get group: %w", err)
 	}
 	if !exists {
-		return fmt.Errorf("%s group not found", opt.GroupID)
+		group = NewGroup(opt.GroupID)
+		group.Namespace = user.Namespace
 	}
 	if err := app.UnassignUserToGroup(ctx, user, group); err != nil {
 		return fmt.Errorf("unassign user to group: %w", err)

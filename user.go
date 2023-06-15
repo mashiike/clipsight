@@ -325,6 +325,10 @@ func (d *Dashboard) EqualIdentifiers(other *Dashboard) bool {
 	return true
 }
 
+func (m UserGroupMembership) GroupID() string {
+	return string(m)
+}
+
 func (m UserGroupMembership) Equals(other UserGroupMembership) bool {
 	return m.EqualIdentifiers(other)
 }
