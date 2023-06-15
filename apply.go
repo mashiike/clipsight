@@ -64,6 +64,7 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 					if err := app.RunGrant(ctx, &GrantOption{
 						GroupID:     c.AfterGroup.ID,
 						DashboardID: g.DashboardID,
+						ExpireDate:  g.Expire,
 					}); err != nil {
 						return err
 					}
