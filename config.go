@@ -97,6 +97,7 @@ func (c *Config) Validate() error {
 		if _, ok := groups[group.ID]; ok {
 			return fmt.Errorf("duplicate group %s", group.ID)
 		}
+		groups[group.ID] = struct{}{}
 	}
 	users := map[string]struct{}{}
 	for _, user := range c.Users {
