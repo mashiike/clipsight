@@ -84,6 +84,7 @@ func (c *Config) Merge(other *Config) {
 			}
 		}
 	}
+	c.Groups = append(c.Groups, other.Groups...)
 	c.Users = append(c.Users, other.Users...)
 }
 

@@ -35,13 +35,18 @@ type equalable[T any] interface {
 	Equals(T) bool
 }
 
-func ListContains[T equalable[T]](list []T, item T) bool {
+func ListPickup[T equalable[T]](list []T, item T) (T, bool) {
 	for _, listItem := range list {
 		if listItem.EqualIdentifiers(item) {
-			return true
+			return listItem, true
 		}
 	}
-	return false
+	return item, false
+}
+
+func ListContains[T equalable[T]](list []T, item T) bool {
+	_, ok := ListPickup(list, item)
+	return ok
 }
 
 func ListDiff[T equalable[T]](a []T, b []T) (added []T, changes []T, removed []T) {

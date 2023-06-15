@@ -2,11 +2,13 @@ package clipsight
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Songmu/flextime"
@@ -14,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/guregu/dynamo"
+	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/exp/slog"
 )
 
@@ -97,6 +100,32 @@ func (g *Group) RevokeDashboard(dashboardID string) bool {
 	return false
 }
 
+func (g *Group) Equals(other *Group) bool {
+	if g == nil || other == nil {
+		return g == nil && other == nil
+	}
+	if g.ID != other.ID {
+		return false
+	}
+	if g.Namespace != other.Namespace {
+		return false
+	}
+	if g.Region != other.Region {
+		return false
+	}
+	if g.TTL != other.TTL {
+		return false
+	}
+	return g.Enabled == other.Enabled
+}
+
+func (g *Group) EqualIdentifiers(other *Group) bool {
+	if g == nil || other == nil {
+		return g == nil && other == nil
+	}
+	return g.ID == other.ID && g.Namespace == other.Namespace
+}
+
 func (g *Group) EqualDashboardPermissions(other *Group) bool {
 	if g == nil || other == nil {
 		return g == nil && other == nil
@@ -112,20 +141,56 @@ func (g *Group) EqualDashboardPermissions(other *Group) bool {
 	return true
 }
 
-func (g *Group) DiffPermissions(other *Group) ([]*Dashboard, []*Dashboard) {
-	a := make([]*Dashboard, 0, len(g.Dashboards))
-	for _, d := range g.Dashboards {
-		if !d.IsVisible() {
-			continue
-		}
-		a = append(a, d)
+func (g *Group) HasChanges(other *Group) bool {
+	return g.Equals(other) && !g.EqualDashboardPermissions(other)
+}
+
+func (g *Group) Diff(group *Group) (string, error) {
+	current, err := json.MarshalIndent(g, "", "  ")
+	if err != nil {
+		return "", err
 	}
-	b := make([]*Dashboard, 0, len(other.Dashboards))
-	for _, d := range other.Dashboards {
-		if !d.IsVisible() {
-			continue
+	currentStr := string(current)
+	other, err := json.MarshalIndent(group, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	otherStr := string(other)
+	currentLines := difflib.SplitLines(currentStr)
+	otherLines := difflib.SplitLines(otherStr)
+	diff := difflib.UnifiedDiff{
+		A:       currentLines,
+		B:       otherLines,
+		Context: len(currentLines) + len(otherLines),
+	}
+
+	text, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return "", err
+	}
+	return text, nil
+}
+
+func (g *Group) DiffPermissions(other *Group) ([]*Dashboard, []*Dashboard) {
+	var a []*Dashboard
+	if g != nil {
+		a = make([]*Dashboard, 0, len(g.Dashboards))
+		for _, d := range g.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			a = append(a, d)
 		}
-		b = append(b, d)
+	}
+	var b []*Dashboard
+	if other != nil {
+		b = make([]*Dashboard, 0, len(other.Dashboards))
+		for _, d := range other.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			b = append(b, d)
+		}
 	}
 	added, changes, removed := ListDiff(a, b)
 	return append(added, changes...), removed
@@ -362,4 +427,31 @@ func (app *ClipSight) DeleteGroupMemberShip(ctx context.Context, user *User, gro
 		return fmt.Errorf("HTTP Status %d", output.Status)
 	}
 	return nil
+}
+
+func (app *ClipSight) ListGroups(ctx context.Context) (<-chan *Group, func()) {
+	ch := make(chan *Group, 100)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			slog.DebugCtx(ctx, "list groups done")
+			wg.Done()
+		}()
+		slog.DebugCtx(ctx, "list groups start")
+		iter := app.ddbTable().Scan().Filter("'HashKey' = ?", "GROUP").Iter()
+		for {
+			var group Group
+			isContinue := iter.NextWithContext(ctx, &group)
+			if !isContinue {
+				break
+			}
+			ch <- &group
+		}
+		if err := iter.Err(); err != nil {
+			slog.ErrorCtx(ctx, "list groups error", "detail", err)
+		}
+		close(ch)
+	}()
+	return ch, wg.Wait
 }

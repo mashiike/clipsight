@@ -201,19 +201,25 @@ func (u *User) GetDashboard(id string) (*Dashboard, bool) {
 }
 
 func (u *User) DiffPermissions(other *User) ([]*Dashboard, []*Dashboard) {
-	a := make([]*Dashboard, 0, len(u.Dashboards))
-	for _, d := range u.Dashboards {
-		if !d.IsVisible() {
-			continue
+	var a []*Dashboard
+	if u != nil {
+		a = make([]*Dashboard, 0, len(u.Dashboards))
+		for _, d := range u.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			a = append(a, d)
 		}
-		a = append(a, d)
 	}
-	b := make([]*Dashboard, 0, len(other.Dashboards))
-	for _, d := range other.Dashboards {
-		if !d.IsVisible() {
-			continue
+	var b []*Dashboard
+	if other != nil {
+		b = make([]*Dashboard, 0, len(other.Dashboards))
+		for _, d := range other.Dashboards {
+			if !d.IsVisible() {
+				continue
+			}
+			b = append(b, d)
 		}
-		b = append(b, d)
 	}
 	added, changes, removed := ListDiff(a, b)
 	return append(added, changes...), removed
@@ -240,6 +246,9 @@ func (u *User) Equals(user *User) bool {
 	if u.Region != user.Region {
 		return false
 	}
+	if u.TTL != user.TTL {
+		return false
+	}
 	return u.Enabled == user.Enabled
 }
 
@@ -247,10 +256,7 @@ func (u *User) EqualIdentifiers(user *User) bool {
 	if u == nil || user == nil {
 		return u == nil && user == nil
 	}
-	if u.Email != user.Email {
-		return false
-	}
-	return true
+	return u.Email == user.Email && u.IAMRoleARN == user.IAMRoleARN
 }
 
 func (u *User) EqualDashboardPermissions(user *User) bool {
@@ -266,6 +272,24 @@ func (u *User) EqualDashboardPermissions(user *User) bool {
 		return false
 	}
 	return true
+}
+
+func (u *User) EqualGroups(user *User) bool {
+	if u == nil || user == nil {
+		return u == nil && user == nil
+	}
+	if len(u.Groups) != len(user.Groups) {
+		return false
+	}
+	assigne, unassign := u.DiffGroups(user)
+	if len(assigne) > 0 || len(unassign) > 0 {
+		return false
+	}
+	return true
+}
+
+func (u *User) HasChanges(user *User) bool {
+	return !u.Equals(user) || !u.EqualDashboardPermissions(user) || !u.EqualGroups(user)
 }
 
 func NewUser(email Email) *User {
