@@ -38,11 +38,12 @@ type ServeOption struct {
 	APIOnly                     bool     `help:"API only mode" env:"CLIPSIGHT_API_ONLY"`
 	Templates                   string   `help:"Path for index.html template dir" type:"path" env:"CLIPSIGHT_TEMPLATES"`
 	Static                      string   `help:"Path for static files" type:"path" env:"CLIPSIGHT_STATIC"`
-	AuthType                    string   `help:"Types of Authentication" enum:"google,aws,none" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
+	AuthType                    string   `help:"Types of Authentication" enum:"google,aws,none,dummy" default:"google" env:"CLIPSIGHT_AUTH_TYPE"`
 	GoogleClientID              string   `help:"google client id for auth type is google" env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret          string   `help:"google client secret for auth type is google" env:"GOOGLE_CLIENT_SECRET"`
 	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
 	AuthHeader                  string   `help:"auth header name for auth type is none" env:"CLIPSIGHT_AUTH_HEADER" default:"ClipSight-Auth-Email"`
+	DummyEmail                  string   `help:"dummy email for auth type is none" env:"CLIPSIGHT_DUMMY_EMAIL" default:""`
 }
 
 //go:embed templates
@@ -225,6 +226,16 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 					http.Error(w, http.StatusText(http.StatusForbidden)+"\nERROR CODE 008", http.StatusForbidden)
 					return
 				}
+				autholization(w, r, next, email)
+			})
+		}
+	case "dummy":
+		email := Email(opt.DummyEmail)
+		if err := email.Validate(); err != nil {
+			return nil, fmt.Errorf("failed validate dummy email: %w", err)
+		}
+		m := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				autholization(w, r, next, email)
 			})
 		}
