@@ -18,6 +18,13 @@ func TestLoadConfig(t *testing.T) {
 	require.EqualValues(t, ">=0.0.0", cfg.RequiredVersion.String())
 	expected := &clipsight.Config{
 		RequiredVersion: cfg.RequiredVersion,
+		Groups: []*clipsight.Group{
+			{
+				ID:        "admin",
+				Namespace: "external",
+				Enabled:   true,
+			},
+		},
 		Users: []*clipsight.User{
 			{
 				Email:      "hoge@example.com",

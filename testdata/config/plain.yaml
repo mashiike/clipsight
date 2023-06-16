@@ -1,5 +1,10 @@
 required_version: ">=0.0.0"
 
+groups:
+  - id: admin
+    namespace: "external"
+    enabled: true
+
 users:
   - email: "tora@example.com"
     namespace: "external"
