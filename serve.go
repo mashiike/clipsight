@@ -44,26 +44,30 @@ type ServeOption struct {
 	GoogleOIDCSessionEncryptKey string   `help:"session encrypt key for google auth" env:"GOOGLE_OIDC_SESSION_ENCRYPT_KEY"`
 	AuthHeader                  string   `help:"auth header name for auth type is none" env:"CLIPSIGHT_AUTH_HEADER" default:"ClipSight-Auth-Email"`
 	DummyEmail                  string   `help:"dummy email for auth type is none" env:"CLIPSIGHT_DUMMY_EMAIL" default:""`
+	EnableConsole               bool     `help:"enable quicksight console" env:"CLIPSIGHT_ENABLE_CONSOLE"`
 }
 
 //go:embed templates
 var defaultTemplates embed.FS
 
 type handler struct {
-	tpl     *template.Template
-	static  http.Handler
-	router  *chi.Mux
-	app     *ClipSight
-	baseURL *url.URL
+	indexTpl      *template.Template
+	consoleTpl    *template.Template
+	static        http.Handler
+	router        *chi.Mux
+	app           *ClipSight
+	baseURL       *url.URL
+	enableConsole bool
 }
 
-func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template, static http.Handler, middlewares chi.Middlewares) *handler {
+func (app *ClipSight) newHandler(baseURL *url.URL, indexTpl *template.Template, consoleTpl *template.Template, static http.Handler, middlewares chi.Middlewares) *handler {
 	h := &handler{
-		tpl:     tpl,
-		router:  chi.NewRouter(),
-		static:  static,
-		app:     app,
-		baseURL: baseURL,
+		indexTpl:   indexTpl,
+		consoleTpl: consoleTpl,
+		router:     chi.NewRouter(),
+		static:     static,
+		app:        app,
+		baseURL:    baseURL,
 	}
 	for _, m := range middlewares {
 		h.router.Use(m)
@@ -73,6 +77,7 @@ func (app *ClipSight) newHandler(baseURL *url.URL, tpl *template.Template, stati
 }
 
 func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
+	var err error
 	authMiddleware, err := app.NewAuthMiddleware(ctx, opt)
 	if err != nil {
 		return err
@@ -87,9 +92,19 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 			return fmt.Errorf("default templates sub: %w", err)
 		}
 	}
-	tpl, err := template.ParseFS(templateFS, "index.html")
-	if err != nil {
-		return fmt.Errorf("failed parse template: %w", err)
+	var indexTpl, consoleTpl *template.Template
+	if !opt.APIOnly {
+		indexTpl, err = template.ParseFS(templateFS, "index.html")
+		if err != nil {
+			return fmt.Errorf("failed parse template: %w", err)
+		}
+	}
+
+	if !opt.APIOnly && opt.EnableConsole {
+		consoleTpl, err = template.ParseFS(templateFS, "console.html")
+		if err != nil {
+			return fmt.Errorf("failed parse template: %w", err)
+		}
 	}
 
 	accessLoggingMiddleware := func(next http.Handler) http.Handler {
@@ -133,7 +148,7 @@ func (app *ClipSight) RunServe(ctx context.Context, opt *ServeOption) error {
 	if opt.Static != "" {
 		static = http.StripPrefix(opt.Prefix, http.FileServer(http.Dir(opt.Static)))
 	}
-	h := app.newHandler(opt.BaseURL, tpl, static, chi.Middlewares{
+	h := app.newHandler(opt.BaseURL, indexTpl, consoleTpl, static, chi.Middlewares{
 		middleware.RequestID,
 		middleware.RealIP,
 		accessLoggingMiddleware,
@@ -256,11 +271,14 @@ func (h *handler) Use(middleware func(http.Handler) http.Handler) {
 }
 
 func (h *handler) SetRoute() {
-	if h.tpl != nil {
+	if h.indexTpl != nil {
 		h.router.Get("/", h.ServeIndex)
 	}
 	if h.static != nil {
 		h.router.Get("/static/*", http.StripPrefix("/static/", h.static).ServeHTTP)
+	}
+	if h.consoleTpl != nil {
+		h.router.Get("/console", h.ServeConsole)
 	}
 	h.router.Route("/api", func(r chi.Router) {
 		r.Get("/health", h.ServeHealth)
@@ -272,7 +290,7 @@ func (h *handler) SetRoute() {
 
 func (h *handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	if err := h.tpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
+	if err := h.indexTpl.ExecuteTemplate(&buf, "index.html", map[string]interface{}{
 		"BaseURL": h.baseURL,
 	}); err != nil {
 		slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
@@ -291,7 +309,7 @@ type ErrorResponse struct {
 }
 
 func (e *ErrorResponse) Error() string {
-	return fmt.Sprintf("status: %d, code: %s, detail: %s", e.Status, e.Code, e.Detail)
+	return fmt.Sprintf("status: %d, code: %s, detail: %s", e.Status, e.Code, e.internal.Error())
 }
 
 func (e *ErrorResponse) Unwrap() error {
@@ -406,14 +424,14 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 			slog.String("quick_sight_user_arn", user.QuickSightUserARN),
 			slog.String("dashboard_id", dashbord),
 		)
-		resp, exists, err := h.generateEmbedUrl(ctx, qs, user.QuickSightUserARN, dashbord)
+		resp, exists, err := h.generateEmbedUrlForDashboard(ctx, qs, user.QuickSightUserARN, dashbord)
 		if err != nil {
 			var e *ErrorResponse
 			if errors.As(err, &e) {
 				slog.ErrorCtx(r.Context(), "failed generate embed url",
 					slog.String("user_id", user.ID),
 					slog.String("error_code", e.Code),
-					slog.String("detail", e.Detail),
+					slog.String("detail", e.internal.Error()),
 				)
 				w.WriteHeader(e.Status)
 				json.NewEncoder(w).Encode(e)
@@ -550,14 +568,14 @@ func (h *handler) ServeDashbord(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	resp, exists, err := h.generateEmbedUrl(r.Context(), qs, user.QuickSightUserARN, dashboardID)
+	resp, exists, err := h.generateEmbedUrlForDashboard(r.Context(), qs, user.QuickSightUserARN, dashboardID)
 	if err != nil {
 		var e *ErrorResponse
 		if errors.As(err, &e) {
 			slog.ErrorCtx(r.Context(), "failed generate embed url",
 				slog.String("user_id", user.ID),
 				slog.String("error_code", e.Code),
-				slog.String("detail", e.Detail),
+				slog.String("detail", e.internal.Error()),
 			)
 			w.WriteHeader(e.Status)
 			json.NewEncoder(w).Encode(e)
@@ -590,7 +608,71 @@ func (h *handler) ServeDashbord(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (h *handler) generateEmbedUrl(ctx context.Context, qs *quicksight.Client, quickSightUserARN string, dashboardID string) (map[string]interface{}, bool, error) {
+func (h *handler) ServeConsole(w http.ResponseWriter, r *http.Request) {
+	user, ok := GetUserFromContext(r.Context())
+	if !ok {
+		slog.WarnCtx(r.Context(), "user context not found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "dashboars not found",
+		})
+		return
+	}
+	if !user.CanConsole {
+		slog.WarnCtx(r.Context(), "user can not console",
+			slog.String("user_id", user.ID),
+		)
+		http.NotFound(w, r)
+		return
+	}
+	slog.InfoCtx(r.Context(), "accume role", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("iam_role", user.IAMRoleARN))
+	qs, err := h.app.NewQuickSightClientWithUser(r.Context(), user)
+	if err != nil {
+		slog.ErrorCtx(r.Context(), "failed initialize QuickSight client",
+			slog.String("user_id", user.ID),
+			slog.String("error_code", "002"),
+			slog.String("detail", err.Error()),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "can not initialize, error_code: 002")
+		return
+	}
+	embededURL, err := h.generateEmbedUrlForConsole(r.Context(), qs, user.QuickSightUserARN)
+	if err != nil {
+		var e *ErrorResponse
+		if errors.As(err, &e) {
+			slog.ErrorCtx(r.Context(), "failed generate embed url",
+				slog.String("user_id", user.ID),
+				slog.String("error_code", e.Code),
+				slog.String("detail", e.internal.Error()),
+			)
+			w.WriteHeader(e.Status)
+			fmt.Fprintf(w, "can not generate embed url, error_code: %s", e.Code)
+			return
+		}
+		slog.ErrorCtx(r.Context(), "failed generate embed url",
+			slog.String("user_id", user.ID),
+			slog.String("error_code", "999"),
+			slog.String("detail", err.Error()),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "can not generate embed url, error_code: 999")
+		return
+	}
+	var buf bytes.Buffer
+	if err := h.consoleTpl.ExecuteTemplate(&buf, "console.html", map[string]interface{}{
+		"BaseURL":    h.baseURL,
+		"EmbededURL": embededURL,
+	}); err != nil {
+		slog.ErrorCtx(r.Context(), "failed execute template", slog.String("error_code", "001"), slog.String("detail", err.Error()))
+		http.Error(w, http.StatusText(http.StatusInternalServerError)+"\nERROR CODE 001", http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, &buf)
+}
+
+func (h *handler) generateEmbedUrlForDashboard(ctx context.Context, qs *quicksight.Client, quickSightUserARN string, dashboardID string) (map[string]interface{}, bool, error) {
 	d, exists, err := h.app.DescribeDashboard(ctx, dashboardID)
 	if err != nil {
 		return nil, false, &ErrorResponse{
@@ -628,4 +710,34 @@ func (h *handler) generateEmbedUrl(ctx context.Context, qs *quicksight.Client, q
 		"name": d.Name,
 		"url":  output.EmbedUrl,
 	}, true, nil
+}
+
+func (h *handler) generateEmbedUrlForConsole(ctx context.Context, qs *quicksight.Client, quickSightUserARN string) (string, error) {
+	output, err := qs.GenerateEmbedUrlForRegisteredUser(ctx, &quicksight.GenerateEmbedUrlForRegisteredUserInput{
+		AwsAccountId: aws.String(h.app.awsAccountID),
+		ExperienceConfiguration: &types.RegisteredUserEmbeddingExperienceConfiguration{
+			QuickSightConsole: &types.RegisteredUserQuickSightConsoleEmbeddingConfiguration{
+				InitialPath: aws.String("/start"),
+				FeatureConfigurations: &types.RegisteredUserConsoleFeatureConfigurations{
+					StatePersistence: &types.StatePersistenceConfigurations{
+						Enabled: false,
+					},
+				},
+			},
+		},
+		UserArn: aws.String(quickSightUserARN),
+		AllowedDomains: []string{
+			h.baseURL.String(),
+		},
+		SessionLifetimeInMinutes: aws.Int64(60),
+	})
+	if err != nil {
+		return "", &ErrorResponse{
+			Status:   http.StatusInternalServerError,
+			Code:     "003",
+			Detail:   "can not get embeded url",
+			internal: err,
+		}
+	}
+	return *output.EmbedUrl, nil
 }

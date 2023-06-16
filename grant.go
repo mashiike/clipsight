@@ -62,7 +62,6 @@ func (app *ClipSight) runGrantForGroup(ctx context.Context, opt *GrantOption) er
 	if !exists {
 		return fmt.Errorf("%s group not found: please create-group", opt.GroupID)
 	}
-
 	if err := app.GrantDashboardToGroup(ctx, group, opt.DashboardID, opt.ExpireDate); err != nil {
 		return err
 	}

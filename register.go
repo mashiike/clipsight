@@ -16,6 +16,8 @@ type RegisterOption struct {
 	IAMRoleARN             string    `help:"IAM Role arn for quicksight user" required:""`
 	Region                 string    `help:"quicksight user region" env:"AWS_DEFAULT_REGION" required:""`
 	RegisterQuickSightUser bool      `name:"register-quicksight-user" help:"if quicksight user not exists, register this"`
+	ProvisioningAs         string    `name:"provisioning-as" help:"provisioning as quicksight user if not exists" default:"Reader" enum:"Reader,Author,Admin"`
+	CanConsole             bool      `name:"can-console" help:"can login quicksight console"`
 	ExpireDate             time.Time `help:"Expiration date for this user (RFC3399)"`
 	Disabled               bool      `help:"disable user"`
 }
@@ -37,7 +39,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 		return fmt.Errorf("get user: %w", err)
 	}
 	if !exists {
-		slog.InfoCtx(ctx, "user not found, create new user", slog.String("id", user.ID), slog.String("email", email.String()))
+		slog.InfoCtx(ctx, "user not found, create new user", slog.String("id", opt.ID), slog.String("email", email.String()))
 		user = NewUser(email)
 	}
 	user.ID = opt.ID
@@ -45,6 +47,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 	user.IAMRoleARN = opt.IAMRoleARN
 	user.Region = opt.Region
 	user.Enabled = !opt.Disabled
+	user.CanConsole = opt.CanConsole
 	if !opt.ExpireDate.IsZero() {
 		user.TTL = opt.ExpireDate
 	} else {
@@ -61,7 +64,7 @@ func (app *ClipSight) RunRegister(ctx context.Context, opt *RegisterOption) erro
 		if !opt.RegisterQuickSightUser {
 			return fmt.Errorf("quicksight user `%s` in namespace `%s` not found", userName, user.Namespace)
 		}
-		qsUser, err = app.RegisterQuickSightUser(ctx, user)
+		qsUser, err = app.RegisterQuickSightUser(ctx, user, opt.ProvisioningAs)
 		if err != nil {
 			return fmt.Errorf("register user: %w", err)
 		}
