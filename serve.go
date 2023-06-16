@@ -51,13 +51,12 @@ type ServeOption struct {
 var defaultTemplates embed.FS
 
 type handler struct {
-	indexTpl      *template.Template
-	consoleTpl    *template.Template
-	static        http.Handler
-	router        *chi.Mux
-	app           *ClipSight
-	baseURL       *url.URL
-	enableConsole bool
+	indexTpl   *template.Template
+	consoleTpl *template.Template
+	static     http.Handler
+	router     *chi.Mux
+	app        *ClipSight
+	baseURL    *url.URL
 }
 
 func (app *ClipSight) newHandler(baseURL *url.URL, indexTpl *template.Template, consoleTpl *template.Template, static http.Handler, middlewares chi.Middlewares) *handler {
