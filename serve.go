@@ -229,6 +229,7 @@ func (app *ClipSight) NewAuthMiddleware(ctx context.Context, opt *ServeOption) (
 				autholization(w, r, next, email)
 			})
 		}
+		return m, nil
 	case "dummy":
 		email := Email(opt.DummyEmail)
 		if err := email.Validate(); err != nil {
