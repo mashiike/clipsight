@@ -1,4 +1,4 @@
-@@ -1,18 +1 @@
+@@ -1,19 +1 @@
 -{
 -  "expire": "0001-01-01T00:00:00Z",
 -  "id": "07b4803ae7e280464f58d6b345cef8824bde652f16c4c8ce0f927e41c2a1c76b",
@@ -15,6 +15,7 @@
 -  "groups": [
 -    "test"
 -  ],
--  "enabled": true
+-  "enabled": true,
+-  "can_console": false
 -}
 +null

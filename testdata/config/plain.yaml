@@ -1,5 +1,10 @@
 required_version: ">=0.0.0"
 
+groups:
+  - id: admin
+    namespace: "external"
+    enabled: true
+
 users:
   - email: "tora@example.com"
     namespace: "external"
@@ -8,6 +13,8 @@ users:
     dashboards:
       - dashboard_id: 12345678-1234-1234-1234-123456789012
         expire: "2021-01-01T00:00:00Z"
+    provisioning_as: Admin
+    can_console: true
     enabled: true
     groups:
       - "admin"

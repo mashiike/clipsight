@@ -100,6 +100,8 @@ func (app *ClipSight) RunApply(ctx context.Context, opt *ApplyOption) error {
 					Namespace:              c.AfterUser.Namespace,
 					IAMRoleARN:             c.AfterUser.IAMRoleARN,
 					Region:                 c.AfterUser.Region,
+					ProvisioningAs:         c.AfterUser.ProvisioningAs,
+					CanConsole:             c.AfterUser.CanConsole,
 					RegisterQuickSightUser: true,
 					ExpireDate:             c.AfterUser.TTL,
 				}); err != nil {

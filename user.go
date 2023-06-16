@@ -47,6 +47,8 @@ type User struct {
 	Dashboards        []*Dashboard          `dynamodb:"Dashboards" yaml:"dashboards" json:"dashboards"`
 	Groups            []UserGroupMembership `dynamodb:"Groups" yaml:"groups" json:"groups"`
 	Enabled           bool                  `dynamodb:"Enabled" yaml:"enabled" json:"enabled"`
+	ProvisioningAs    string                `dynamodb:"-" yaml:"provisioning_as,omitempty" json:"provisioning_as,omitempty"`
+	CanConsole        bool                  `dynamodb:"CanConsole" yaml:"can_console" json:"can_console"`
 	CreatedAt         time.Time             `dynamodb:"CreatedAt,unixtime" yaml:"-" json:"-"`
 	UpdatedAt         time.Time             `dynamodb:"UpdatedAt,unixtime" yaml:"-" json:"-"`
 	QuickSightUserARN string                `dynamodb:"QuickSightUserARN" yaml:"-" json:"-"`
@@ -226,7 +228,14 @@ func (u *User) DiffPermissions(other *User) ([]*Dashboard, []*Dashboard) {
 }
 
 func (u *User) DiffGroups(other *User) ([]UserGroupMembership, []UserGroupMembership) {
-	added, _, removed := ListDiff(u.Groups, other.Groups)
+	var a, b []UserGroupMembership
+	if u != nil {
+		a = u.Groups
+	}
+	if other != nil {
+		b = other.Groups
+	}
+	added, _, removed := ListDiff(a, b)
 	return added, removed
 }
 
@@ -247,6 +256,9 @@ func (u *User) Equals(user *User) bool {
 		return false
 	}
 	if u.TTL != user.TTL {
+		return false
+	}
+	if u.CanConsole != user.CanConsole {
 		return false
 	}
 	return u.Enabled == user.Enabled
@@ -413,7 +425,13 @@ func (app *ClipSight) DescribeQuickSightUser(ctx context.Context, user *User) (*
 	if err != nil {
 		return nil, false, err
 	}
-	slog.DebugCtx(ctx, "try DescribeQuicksightUser", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
+	slog.DebugCtx(ctx, "try DescribeQuicksightUser",
+		slog.String("aws_account_id", app.awsAccountID),
+		slog.String("namespace", user.Namespace),
+		slog.String("user_id", user.ID),
+		slog.String("email", user.Email.String()),
+		slog.String("quick_sight_user_name", userName),
+	)
 	output, err := app.qs.DescribeUser(ctx, &quicksight.DescribeUserInput{
 		AwsAccountId: aws.String(app.awsAccountID),
 		Namespace:    aws.String(user.Namespace),
@@ -435,10 +453,21 @@ func (app *ClipSight) DescribeQuickSightUser(ctx context.Context, user *User) (*
 	return output.User, true, nil
 }
 
-func (app *ClipSight) RegisterQuickSightUser(ctx context.Context, user *User) (*types.User, error) {
+func (app *ClipSight) RegisterQuickSightUser(ctx context.Context, user *User, role string) (*types.User, error) {
 	userName, err := user.QuickSightUserName()
 	if err != nil {
 		return nil, err
+	}
+	var userRole types.UserRole
+	switch strings.ToUpper(role) {
+	case "READER", "":
+		userRole = types.UserRoleReader
+	case "AUTHOR":
+		userRole = types.UserRoleAuthor
+	case "ADMIN":
+		userRole = types.UserRoleAdmin
+	default:
+		return nil, fmt.Errorf("invalid role: %s", role)
 	}
 	slog.DebugCtx(ctx, "try RegisterQuicksightUser", slog.String("user_id", user.ID), slog.String("email", user.Email.String()), slog.String("quick_sight_user_name", userName))
 	output, err := app.qs.RegisterUser(ctx, &quicksight.RegisterUserInput{
@@ -446,7 +475,7 @@ func (app *ClipSight) RegisterQuickSightUser(ctx context.Context, user *User) (*
 		Namespace:    aws.String(user.Namespace),
 		Email:        aws.String(user.Email.String()),
 		IdentityType: types.IdentityTypeIam,
-		UserRole:     types.UserRoleReader,
+		UserRole:     userRole,
 		IamArn:       aws.String(user.IAMRoleARN),
 		SessionName:  aws.String(user.Email.String()),
 	})
