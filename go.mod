@@ -15,7 +15,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/fujiwara/go-amzn-oidc v0.0.6
 	github.com/fujiwara/ridge v0.6.1
-	github.com/go-chi/chi v1.5.4
+	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/guregu/dynamo v1.19.0
 	github.com/hashicorp/go-version v1.6.0
