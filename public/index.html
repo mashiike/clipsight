@@ -21,7 +21,7 @@
 <body>
     <script>
         var result = window.fetch(
-            "{{ .BaseURL.JoinPath `/api/dashboards` }}", {
+            "/api/dashboards", {
             method: 'GET',
             accept: 'text/html',
             mode: 'no-cors'
@@ -63,7 +63,7 @@
                         contentInnerDiv.classList.add('ratio');
                         contentInnerDiv.classList.add('ratio-1x1');
                         const iframe = document.createElement('iframe');
-                        iframe.src = value.url;
+                        iframe.src = value.embeded_url;
                         contentInnerDiv.appendChild(iframe);
                         contentItem.appendChild(contentInnerDiv);
                         content.appendChild(contentItem);
