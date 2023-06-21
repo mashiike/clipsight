@@ -36,7 +36,7 @@
                 data.json().then(result => {
                     var content = document.getElementById('content');
                     const iframe = document.createElement('iframe');
-                    iframe.src = result.embeded_url;
+                    iframe.src = result.embed_url;
                     content.appendChild(iframe);
                 });
             });
