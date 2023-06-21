@@ -392,7 +392,7 @@ func (h *handler) ServeDashbords(w http.ResponseWriter, r *http.Request) {
 	if fieldsStr := r.URL.Query().Get("fields"); fieldsStr != "" {
 		fields = strings.Split(fieldsStr, ",")
 	} else {
-		fields = []string{"id", "name", "embeded_url"}
+		fields = []string{"id", "name", "embed_url"}
 	}
 	dashboards, err := h.app.GetVisibleDashboardIDs(ctx, user)
 	if err != nil {
@@ -556,7 +556,7 @@ func (h *handler) ServeDashbord(w http.ResponseWriter, r *http.Request) {
 	if fieldsStr := r.URL.Query().Get("fields"); fieldsStr != "" {
 		fields = strings.Split(fieldsStr, ",")
 	} else {
-		fields = []string{"id", "name", "embeded_url"}
+		fields = []string{"id", "name", "embed_url"}
 	}
 	resp, exists, err := h.generateEmbedUrlForDashboard(r.Context(), qs, user.QuickSightUserARN, dashboardID, fields)
 	if err != nil {
@@ -673,7 +673,7 @@ func (h *handler) ServeConsole(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"embeded_url": embededURL,
+		"embed_url": embededURL,
 	})
 }
 
@@ -701,7 +701,7 @@ func (h *handler) generateEmbedUrlForDashboard(ctx context.Context, qs *quicksig
 			resp["created_at"] = (*d.CreatedTime).Unix()
 		case "id":
 			resp["id"] = dashboardID
-		case "embeded_url":
+		case "embed_url":
 			output, err := qs.GenerateEmbedUrlForRegisteredUser(ctx, &quicksight.GenerateEmbedUrlForRegisteredUserInput{
 				AwsAccountId: aws.String(h.app.awsAccountID),
 				ExperienceConfiguration: &types.RegisteredUserEmbeddingExperienceConfiguration{
@@ -723,7 +723,7 @@ func (h *handler) generateEmbedUrlForDashboard(ctx context.Context, qs *quicksig
 					internal: err,
 				}
 			}
-			resp["embeded_url"] = output.EmbedUrl
+			resp["embed_url"] = output.EmbedUrl
 		}
 	}
 	return resp, true, nil
