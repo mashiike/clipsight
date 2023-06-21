@@ -1,4 +1,10 @@
 # Changelog
+## [v0.4.2](https://github.com/mashiike/clipsight/compare/v0.4.1...v0.4.2) - 2023-06-21
+- fix Group.HasChanges by @mashiike in https://github.com/mashiike/clipsight/pull/105
+- Bump github.com/aws/aws-sdk-go-v2/service/quicksight from 1.37.1 to 1.37.2 by @dependabot in https://github.com/mashiike/clipsight/pull/98
+- Bump github.com/go-chi/chi from 1.5.4 to 4.1.2+incompatible by @dependabot in https://github.com/mashiike/clipsight/pull/99
+- Bump github.com/aws/aws-sdk-go from 1.44.282 to 1.44.286 by @dependabot in https://github.com/mashiike/clipsight/pull/104
+
 ## [v0.4.1](https://github.com/mashiike/clipsight/compare/v0.4.0...v0.4.1) - 2023-06-21
 - not embeded_url, embed_url by @mashiike in https://github.com/mashiike/clipsight/pull/102
 - Bump github.com/aws/aws-sdk-go-v2/config from 1.18.26 to 1.18.27 by @dependabot in https://github.com/mashiike/clipsight/pull/100
