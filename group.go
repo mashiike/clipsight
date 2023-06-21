@@ -142,7 +142,7 @@ func (g *Group) EqualDashboardPermissions(other *Group) bool {
 }
 
 func (g *Group) HasChanges(other *Group) bool {
-	return g.Equals(other) && !g.EqualDashboardPermissions(other)
+	return !g.Equals(other) || !g.EqualDashboardPermissions(other)
 }
 
 func (g *Group) Diff(group *Group) (string, error) {
