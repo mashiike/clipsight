@@ -546,9 +546,12 @@ func (app *ClipSight) GetVisibleDashboardIDs(ctx context.Context, user *User) ([
 			continue
 		}
 		for _, d := range group.Dashboards {
+			slog.DebugCtx(ctx, "check group dashboard visibility", slog.String("dashboard_id", d.DashboardID), slog.String("group_id", group.ID))
 			if !d.IsVisible() {
+				slog.DebugCtx(ctx, "group dashboard is not visible", slog.String("dashboard_id", d.DashboardID), slog.String("group_id", group.ID))
 				continue
 			}
+			slog.DebugCtx(ctx, "group dashboard is visible", slog.String("dashboard_id", d.DashboardID), slog.String("group_id", group.ID))
 			dashboards[d.DashboardID] = true
 		}
 	}
