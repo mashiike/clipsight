@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.18.1
 	github.com/aws/aws-sdk-go-v2/config v1.18.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.26
-	github.com/aws/aws-sdk-go-v2/service/quicksight v1.37.1
+	github.com/aws/aws-sdk-go-v2/service/quicksight v1.37.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.19.2
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/fatih/color v1.15.0
