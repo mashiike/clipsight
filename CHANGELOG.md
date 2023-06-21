@@ -1,4 +1,8 @@
 # Changelog
+## [v0.4.1](https://github.com/mashiike/clipsight/compare/v0.4.0...v0.4.1) - 2023-06-21
+- not embeded_url, embed_url by @mashiike in https://github.com/mashiike/clipsight/pull/102
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.18.26 to 1.18.27 by @dependabot in https://github.com/mashiike/clipsight/pull/100
+
 ## [v0.4.0](https://github.com/mashiike/clipsight/compare/v0.3.0...v0.4.0) - 2023-06-20
 - administration for console embeded by @mashiike in https://github.com/mashiike/clipsight/pull/94
 - no template, and custom spa frontend option by @mashiike in https://github.com/mashiike/clipsight/pull/101
