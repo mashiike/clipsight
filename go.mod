@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/alecthomas/kong v0.7.1
-	github.com/aws/aws-sdk-go v1.44.286
+	github.com/aws/aws-sdk-go v1.44.306
 	github.com/aws/aws-sdk-go-v2 v1.18.1
 	github.com/aws/aws-sdk-go-v2/config v1.18.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.26
@@ -17,7 +17,7 @@ require (
 	github.com/fujiwara/ridge v0.6.1
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/chi/v5 v5.0.8
-	github.com/guregu/dynamo v1.19.0
+	github.com/guregu/dynamo v1.20.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mashiike/accesslogger v0.2.0
 	github.com/mashiike/google-oidc-middleware v0.1.0
@@ -115,6 +115,7 @@ require (
 	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/oauth2 v0.9.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
