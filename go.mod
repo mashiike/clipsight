@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/alecthomas/kong v0.7.1
-	github.com/aws/aws-sdk-go v1.44.286
+	github.com/aws/aws-sdk-go v1.44.333
 	github.com/aws/aws-sdk-go-v2 v1.18.1
 	github.com/aws/aws-sdk-go-v2/config v1.18.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.26
